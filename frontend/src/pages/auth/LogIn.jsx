@@ -1,101 +1,52 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import Logo from "../../assets/logo.png";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { auth, googleProvider } from "../../../lib/firebase";
-import {
-  signInWithEmailAndPassword,
-  signInWithPopup,
-  sendPasswordResetEmail,
-  sendSignInLinkToEmail,
-  isSignInWithEmailLink,
-  signInWithEmailLink,
-} from "firebase/auth";
+import { login } from "../../../lib/api.js";
 import { Eye, EyeOff } from "lucide-react";
 
 export const LogIn = () => {
   const navigate = useNavigate();
   const location = useLocation();
+
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
+  const [displayname, setDisplayname] = useState(""); // optional
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
-  const [showPass, setShowPass] = useState(true); // show password by default
+  const [showPass, setShowPass] = useState(true);
+  const [showUser, setShowUser] = useState(true);
 
-  // Handle magic-link complete if the user opens the link on this page
-  React.useEffect(() => {
-    (async () => {
-      try {
-        if (isSignInWithEmailLink(auth, window.location.href)) {
-          let savedEmail = window.localStorage.getItem("emailForSignIn");
-          if (!savedEmail) savedEmail = window.prompt("Confirm your email for sign in");
-          if (savedEmail) {
-            await signInWithEmailLink(auth, savedEmail, window.location.href);
-            window.localStorage.removeItem("emailForSignIn");
-            navigate(location.state?.from || "/dashboard");
-          }
-        }
-      } catch (e) {
-        console.error(e);
-        setMsg("Could not complete magic link sign-in.");
-      }
-    })();
-  }, [navigate, location.state]);
-
-  const loginWithEmail = async (e) => {
+  const loginWithMail = async (e) => {
     e.preventDefault();
+    if (!email || !pass) return;
     setLoading(true);
     setMsg("");
-    try {
-      await signInWithEmailAndPassword(auth, email, pass);
-      navigate(location.state?.from || "/dashboard"); // fixed typo from /dasboard
-    } catch (err) {
-      setMsg(err.message ?? "Login failed");
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const loginWithGoogle = async () => {
-    setLoading(true);
-    setMsg("");
     try {
-      await signInWithPopup(auth, googleProvider);
+      const payload = {
+        email,
+        password: pass,
+        ...(displayname ? { displayName: displayname } : {}),
+      };
+
+      const out = await login(payload);
+      // Helpful once while debugging (then remove):
+      console.log('login() raw response:', out);
+
+      // Normalize: accept { token, user } OR { data: { token, user } } OR { accessToken }
+      const data = out?.data ?? out ?? {};
+      const token = data.token ?? data.accessToken ?? data.jwt ?? null;
+      const user  = data.user  ?? data.profile    ?? null;
+
+      if (token) localStorage.setItem('token', token);
+      if (user)  localStorage.setItem('me', JSON.stringify(user));
+
       navigate(location.state?.from || "/dashboard");
     } catch (err) {
-      setMsg(err.message ?? "Google sign-in failed");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const forgotPassword = async () => {
-    if (!email) return setMsg("Enter your email first.");
-    setLoading(true);
-    setMsg("");
-    try {
-      await sendPasswordResetEmail(auth, email);
-      setMsg("Password reset email sent.");
-    } catch (err) {
-      setMsg(err.message ?? "Could not send reset email.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const sendMagicLink = async () => {
-    if (!email) return setMsg("Enter your email to receive a magic link.");
-    setLoading(true);
-    setMsg("");
-    try {
-      const actionCodeSettings = {
-        url: window.location.origin + "/login", // route that handles link completion
-        handleCodeInApp: true,
-      };
-      await sendSignInLinkToEmail(auth, email, actionCodeSettings);
-      window.localStorage.setItem("emailForSignIn", email);
-      setMsg("Magic link sent! Check your email.");
-    } catch (err) {
-      setMsg(err.message ?? "Could not send magic link.");
+      const apiMsg =
+        err?.message ||
+        "Login failed. Please try again.";
+      setMsg(apiMsg);
     } finally {
       setLoading(false);
     }
@@ -130,7 +81,7 @@ export const LogIn = () => {
             </div>
           )}
 
-          <form onSubmit={loginWithEmail} className="flex flex-col gap-4 w-full">
+          <form onSubmit={loginWithMail} className="flex flex-col gap-4 w-full">
             <input
               type="email"
               name="email"
@@ -167,39 +118,37 @@ export const LogIn = () => {
               </button>
             </div>
 
-            <button
-              type="button"
-              onClick={forgotPassword}
-              className="text-sm text-blue-600 text-left hover:underline"
-            >
-              Forgot Password?
-            </button>
+            {/* Optional displayname (if your backend accepts email OR displayname) */}
+            <div className="relative w-full">
+              <input
+                type={showUser ? "text" : "password"}
+                name="displayname"
+                id="displayname"
+                placeholder="Display name (optional)"
+                value={displayname}
+                onChange={(e) => setDisplayname(e.target.value)}
+                className="border p-2 w-full rounded-[5px] pr-10"
+                autoComplete="username"
+              />
+              <button
+                type="button"
+                onClick={() => setShowUser((s) => !s)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-gray-100"
+                aria-label={showUser ? "Hide display name" : "Show display name"}
+                title={showUser ? "Hide display name" : "Show display name"}
+              >
+                {showUser ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
 
             <button
-              disabled={loading}
+              type="submit"
+              disabled={loading || !email || !pass}
               className="bg-blue-500 w-full text-xl text-white rounded-sm p-2 hover:bg-black disabled:opacity-50"
             >
               {loading ? "Logging in..." : "Log In"}
             </button>
           </form>
-
-          <div className="my-4 text-sm">or</div>
-
-          <button
-            onClick={loginWithGoogle}
-            disabled={loading}
-            className="border w-full p-2 rounded hover:bg-gray-50 disabled:opacity-50"
-          >
-            Continue with Google
-          </button>
-
-          <button
-            onClick={sendMagicLink}
-            disabled={loading}
-            className="mt-3 text-sm underline hover:text-blue-600 disabled:opacity-50"
-          >
-            Log in with a magic link
-          </button>
 
           <div className="mt-6 text-sm">
             Don&apos;t have an account?{" "}

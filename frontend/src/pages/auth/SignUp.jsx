@@ -1,54 +1,55 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import Logo from "../../assets/logo.png";
 import { Link, useNavigate } from "react-router-dom";
 import { FaFacebook, FaGithub, FaGoogle } from "react-icons/fa";
-import { auth } from "../../../lib/firebase";
-import {
-  GoogleAuthProvider,
-  GithubAuthProvider,
-  FacebookAuthProvider,
-  signInWithPopup,
-  createUserWithEmailAndPassword,
-} from "firebase/auth";
+import { register } from "../../../lib/api.js";
 
 export const SignUp = () => {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ email: "", password: "", username: "" });
+  const [form, setForm] = useState({ email: "", password: "", displayName: "" });
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
-  const [showPassword, setShowPassword] = useState(true); // 👈 default: show password
+  const [showPassword, setShowPassword] = useState(true); // default: show password
 
   const onChange = (e) => {
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
   };
 
-  const withPopup = async (provider) => {
-    setErr(null);
-    setLoading(true);
-    try {
-      await signInWithPopup(auth, provider);
-      navigate("/dashboard");
-    } catch (e) {
-      setErr(e?.message || "Sign in failed");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const googleAuth = () => withPopup(new GoogleAuthProvider());
-  const githubAuth = () => withPopup(new GithubAuthProvider());
-  const facebookAuth = () => withPopup(new FacebookAuthProvider());
+  const validateDisplayName = (u) =>
+    /^[A-Za-z0-9_]+$/.test(u || "") && (u || "").length >= 3;
 
   const emailSignUp = async (e) => {
     e.preventDefault();
     setErr(null);
+
+    if (!form.email || !form.password || !form.displayName) {
+      return setErr("Please fill all fields.");
+    }
+    if (!validateDisplayName(form.displayName)) {
+      return setErr(
+        "Display name must be at least 3 characters and contain only letters, numbers, and underscores."
+      );
+    }
+
     setLoading(true);
     try {
-      if (!form.email || !form.password) throw new Error("Fill all fields");
-      await createUserWithEmailAndPassword(auth, form.email, form.password);
-      navigate("/login");
+      const { data } = await register({
+        email: form.email,
+        password: form.password,
+        displayName: form.displayName, // <-- backend expects displayName
+      });
+
+      if (data?.token) localStorage.setItem("token", data.token);
+      if (data?.user) localStorage.setItem("me", JSON.stringify(data.user));
+
+      navigate(data?.token ? "/dashboard" : "/login");
     } catch (e) {
-      setErr(e?.message || "Sign up failed");
+      const apiMsg =
+        e?.response?.data?.message ||
+        e?.response?.data?.error ||
+        e?.message ||
+        "Sign up failed";
+      setErr(apiMsg);
     } finally {
       setLoading(false);
     }
@@ -78,27 +79,27 @@ export const SignUp = () => {
           <div className="flex flex-col gap-4 items-center">
             <h1 className="text-xl font-bold">Sign Up for free</h1>
 
-            {/* Social sign-ups */}
+            {/* Social sign-ups (disabled until backend OAuth is ready) */}
             <button
-              className="flex flex-row items-center gap-2 bg-gray-100 w-[220px] p-3 rounded-xl hover:bg-yellow-300 hover:text-white"
-              onClick={googleAuth}
-              disabled={loading}
+              className="flex flex-row items-center gap-2 bg-gray-100 w-[220px] p-3 rounded-xl disabled:opacity-60"
+              disabled
+              title="Google sign-up coming soon"
             >
               Sign Up with Google <FaGoogle />
             </button>
 
             <button
-              className="flex flex-row items-center gap-2 bg-gray-100 w-[220px] p-3 rounded-xl hover:bg-black hover:text-white"
-              onClick={githubAuth}
-              disabled={loading}
+              className="flex flex-row items-center gap-2 bg-gray-100 w-[220px] p-3 rounded-xl disabled:opacity-60"
+              disabled
+              title="GitHub sign-up coming soon"
             >
               Sign Up with GitHub <FaGithub />
             </button>
 
             <button
-              className="flex flex-row items-center gap-2 bg-gray-100 w-[220px] p-3 rounded-xl hover:bg-blue-500 hover:text-white"
-              onClick={facebookAuth}
-              disabled={loading}
+              className="flex flex-row items-center gap-2 bg-gray-100 w-[220px] p-3 rounded-xl disabled:opacity-60"
+              disabled
+              title="Facebook sign-up coming soon"
             >
               Sign Up with Facebook <FaFacebook />
             </button>
@@ -116,6 +117,8 @@ export const SignUp = () => {
                   className="border p-2 w-80 rounded-[5px]"
                   value={form.email}
                   onChange={onChange}
+                  autoComplete="email"
+                  required
                 />
 
                 {/* Password input with toggle */}
@@ -128,6 +131,8 @@ export const SignUp = () => {
                     className="border p-2 w-full rounded-[5px] pr-12"
                     value={form.password}
                     onChange={onChange}
+                    autoComplete="new-password"
+                    required
                   />
                   <button
                     type="button"
@@ -140,12 +145,14 @@ export const SignUp = () => {
 
                 <input
                   type="text"
-                  name="username"
-                  id="username"
-                  placeholder="Username"
+                  name="displayName"
+                  id="displayName"
+                  placeholder="Display name"
                   className="border p-2 w-80 rounded-[5px]"
-                  value={form.username}
+                  value={form.displayName}
                   onChange={onChange}
+                  autoComplete="username"
+                  required
                 />
 
                 <button
@@ -161,11 +168,11 @@ export const SignUp = () => {
 
               <div className="flex flex-col items-center gap-4 mt-5">
                 <p className="text-sm">
-                  Your UserName will be used in your Lync link. It must be
+                  Your display name will be used in your Lync link. It must be
                   unique and can only contain letters, numbers, and underscores.
                 </p>
                 <p className="text-sm">
-                  By signing up, you agree to Our Terms of Service and Privacy
+                  By signing up, you agree to our Terms of Service and Privacy
                   Policy.
                 </p>
               </div>

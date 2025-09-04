@@ -1,19 +1,46 @@
+// lib/api.js
 import axios from "axios";
 
-// point at your Render backend (no trailing slash)
-const BASE_URL = "https://lync-backend-gghg.onrender.com";
+// Use Vite env: proxy in dev, absolute URL in prod
+const API = 'https://lync-backend-gghg.onrender.com';
 
 export const api = axios.create({
-  baseURL: BASE_URL,
-  // withCredentials: true, // enable if you later switch to cookies
+  baseURL: API,
+  timeout: 100,
+  headers: {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  },
+  // withCredentials: true, // enable if you switch to cookie auth
 });
 
-// attach JWT if you store it (optional)
+// token helpers
+export const setAuthToken = (token) => {
+  if (token) {
+    localStorage.setItem("token", token);
+  } else {
+    localStorage.removeItem("token");
+  }
+};
+
+// attach JWT if present
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
+
+// optional: auto-clear auth on 401
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err?.response?.status === 401) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("me");
+    }
+    return Promise.reject(err);
+  }
+);
 
 // handy helpers
 export const pingHealth = () => api.get("/api/health");
@@ -26,4 +53,21 @@ export const toggleLink = (id, isActive) => api.patch(`/api/links/me/${id}`, { i
 export const reorderLinks = (items) => api.post(`/api/links/me/reorder`, { items });
 
 // public page
-export const getPublicProfile = (handle) => api.get(`/api/public/${encodeURIComponent(handle)}`);
+export const getPublicProfile = (handle) =>
+  api.get(`/api/public/${encodeURIComponent(handle)}`);
+
+// auth
+export const register = (payload) => api.post("/api/auth/register", payload); // { email, password, displayName? }
+export const login = (body) => {
+  return axios
+    .post(`${API}/auth/login`, body, {
+      // withCredentials: true, // uncomment if using cookie sessions
+      headers: { 'Content-Type': 'application/json' },
+    })
+    .then(r => r.data); // normalize so the component gets the payload directly
+}// { email, password, displayName? }
+export const logout = () => {
+  setAuthToken(null);
+  localStorage.removeItem("me");
+  return Promise.resolve();
+};
