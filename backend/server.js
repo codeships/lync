@@ -1,6 +1,11 @@
+<<<<<<< HEAD
 // server.js (ESM)
 import express from "express";
 import cors from "cors";
+=======
+import cors from "cors";
+import express from "express";
+>>>>>>> 18316552b2d56e74d5729faae38c2c39603c8fa5
 import helmet from "helmet";
 import dotenv from "dotenv";
 import morgan from "morgan";
@@ -9,8 +14,11 @@ import authRoutes from "./routes/auth.route.js";
 import profileRoutes from "./routes/profile.route.js";
 import linksRoutes from "./routes/link.route.js";
 import publicRoutes from "./routes/public.route.js";
+<<<<<<< HEAD
 import dashboardRoutes from "./routes/dashboard.route.js";
 import { authRequired } from "./middleware/auth.js";
+=======
+>>>>>>> 18316552b2d56e74d5729faae38c2c39603c8fa5
 
 import { connectDB } from "./config/db.js";
 
@@ -47,6 +55,7 @@ app.options(/.*/, cors());
 
 // Security, parsers, logging
 app.use(helmet());
+<<<<<<< HEAD
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan("dev"));
@@ -87,3 +96,26 @@ const start = async () => {
 };
 
 start();
+=======
+app.use(express.json());
+app.use(express.urlencoded({ extended: true})); // ❌ This is missing the 'extended' option
+app.use(morgan("dev")); //✅ Fix: Move this near the top, right after creating the app
+
+//❌ This can return undefined if FRONTEND_ORIGIN is not set
+app.use(
+  cors({
+    origin: process.env.FRONTEND_ORIGIN?.split(",") ?? "*",
+    credentials: true,
+  })
+);
+
+app.use("/api/auth", authRoutes);
+app.use("/api/profile", profileRoutes);
+app.use("/api/links", linksRoutes);
+app.use("/api/public", publicRoutes);
+
+
+app.listen(PORT, () => {
+  console.log(`API listening on http://localhost:${PORT}`);
+});
+>>>>>>> 18316552b2d56e74d5729faae38c2c39603c8fa5
