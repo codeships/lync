@@ -5,26 +5,21 @@ import bcrypt from "bcryptjs";
 const SocialsSchema = new mongoose.Schema(
   {
     instagram: { type: String, default: "" },
-<<<<<<< HEAD
     twitter:   { type: String, default: "" },
     facebook:  { type: String, default: "" },
-=======
     twitter: { type: String, default: "" },
     facebook: { type: String, default: "" },
->>>>>>> 18316552b2d56e74d5729faae38c2c39603c8fa5
   },
   { _id: false }
 );
 
 const ThemeSchema = new mongoose.Schema(
   {
-<<<<<<< HEAD
     theme:           { type: String, enum: ["light", "dark", "system", "custom"], default: "light" },
     buttonStyle:     { type: String, enum: ["rounded", "square", "pill"], default: "rounded" },
     buttonColor:     { type: String, default: "#3b82f6" },
     backgroundColor: { type: String, default: "#ffffff" },
     textColor:       { type: String, default: "#000000" },
-=======
     theme: {
       type: String,
       enum: ["light", "dark", "system", "custom"],
@@ -38,12 +33,10 @@ const ThemeSchema = new mongoose.Schema(
     buttonColor: { type: String, default: "#3b82f6" },
     backgroundColor: { type: String, default: "#ffffff" },
     textColor: { type: String, default: "#000000" },
->>>>>>> 18316552b2d56e74d5729faae38c2c39603c8fa5
   },
   { _id: false }
 );
 
-<<<<<<< HEAD
 // simple handle normalizer (lowercase, spaces->dash, safe chars)
 function normalizeHandle(s = "") {
   return s
@@ -136,46 +129,5 @@ UserSchema.methods.comparePassword = async function (plain) {
   if (!this.passwordHash) return false; // guard to avoid "Illegal arguments"
   return bcrypt.compare(plain, this.passwordHash);
 };
-=======
-const UserSchema = new mongoose.Schema(
-  {
-    email: {
-      type: String,
-      required: true,
-      unique: true,
-      lowercase: true,
-      index: true,
-      trim: true,
-    },
-    passwordHash: { type: String, required: true },
-    displayName: { type: String, default: "", trim: true },
-    handle: {
-      type: String,
-      required: true,
-      unique: true,
-      lowercase: true,
-      index: true,
-      trim: true,
-      maxLength: 30
-    },
-    bio: { type: String, default: "", maxLength: 300 },
-    avatarUrl: { type: String, default: "" },
-    socials: { type: SocialsSchema, default: () => ({}) },
-    theme: { type: ThemeSchema, default: () => ({}) },
-    privacy: { type: String, enum: ["public", "unlisted"], default: "public" },
-  },
-  { timestamps: true }
-);
-// 🔴 Suggestion: Consider trimming string fields to avoid trailing whitespace
-// Example:
-// email: { ..., trim: true }
-// handle: { ..., trim: true }
-// displayName: { ..., trim: true }
-
-// 🔴 Suggestion: Add maxLength validation to prevent abuse or overflow
-// Example:
-// bio: { type: String, default: "", maxLength: 300 }
-// handle: { ..., maxLength: 30 }
->>>>>>> 18316552b2d56e74d5729faae38c2c39603c8fa5
 
 export default mongoose.model("User", UserSchema);

@@ -25,21 +25,12 @@ export function signAuthToken(userId, opts = {}) {
 /** Pull token from header, cookie, or query */
 export function getTokenFromRequest(req) {
   const header = req.headers.authorization || "";
-<<<<<<< HEAD
   if (header.startsWith("Bearer ")) return header.slice(7).trim();
   if (req.cookies?.token) return req.cookies.token;           // requires cookie-parser
   if (req.headers["x-access-token"]) return String(req.headers["x-access-token"]);
   if (req.query?.token) return String(req.query.token);
   return null;
 }
-=======
-
-  // ✅ This correctly checks for Bearer token format
-  const token = header.startsWith("Bearer ") ? header.slice(7) : null;
-
-  // 🔴 Suggestion: Differentiate between "missing token" and "invalid token" for better debugging
-  if (!token) return res.status(401).json({ error: "Unauthorized" });
->>>>>>> 18316552b2d56e74d5729faae38c2c39603c8fa5
 
 /** Set an HTTP-only auth cookie (useful if you prefer cookies over Bearer) */
 export function setAuthCookie(res, token, days = 7) {
@@ -68,35 +59,12 @@ export function authRequired(req, res, next) {
   const token = getTokenFromRequest(req);
   if (!token) return res.status(401).json({ error: "Unauthorized" });
   try {
-<<<<<<< HEAD
     const payload = jwt.verify(token, JWT_SECRET);
     req.userId = payload.sub;
     req.jwt = payload;
     return next();
   } catch {
     return res.status(401).json({ error: "Invalid or expired token" });
-=======
-    // 🔴 Suggestion: Add check if JWT_SECRET is missing
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
-
-    // 🔴 Improvement: Handle case where JWT_SECRET is undefined (would throw unclear error)
-    // Example: if (!process.env.JWT_SECRET) throw new Error("JWT_SECRET not set");
-
-    // ✅ Token is valid — now check if user exists
-    const user = await User.findById(payload.sub).lean();
-
-    // ✅ If user not found, reject request
-    if (!user) return res.status(401).json({ error: "Unauthorized" });
-
-    // ✅ Attach user object to request
-    req.user = user;
-    next();
-  } catch {
-    // 🔴 Suggestion: Log the actual error during development (optional, but useful)
-    // console.error("JWT verification failed:", err.message);
-
-    return res.status(401).json({ error: "Unauthorized" });
->>>>>>> 18316552b2d56e74d5729faae38c2c39603c8fa5
   }
 }
 
