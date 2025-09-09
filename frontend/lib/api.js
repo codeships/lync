@@ -2,7 +2,7 @@
 import axios from "axios";
 
 // Use Vite env: proxy in dev, absolute URL in prod
-const API = 'https://lync-backend-gghg.onrender.com';
+const API = 'https://localhost:4000';
 
 export const api = axios.create({
   baseURL: API,
