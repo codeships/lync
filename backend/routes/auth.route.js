@@ -11,7 +11,9 @@ const router = Router();
 /* ========= Config ========= */
 const JWT_SECRET = process.env.JWT_SECRET || "dev_secret";
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
-const USE_AUTH_COOKIE = process.env.SET_AUTH_COOKIE === "true";
+const USE_AUTH_COOKIE = process.env.SET_AUTH_COOKIE === "true"; // controls cookie vs token-in-body
+const COOKIE_NAME = process.env.AUTH_COOKIE_NAME || "token";
+const COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 /* ========= Helpers ========= */
 const normalizeEmail = (s = "") => s.toString().trim().toLowerCase();
@@ -45,11 +47,21 @@ function signJwt(payload) {
 
 function setAuthCookie(res, token) {
   if (!USE_AUTH_COOKIE) return;
-  res.cookie("token", token, {
+  res.cookie(COOKIE_NAME, token, {
     httpOnly: true,
+    secure: process.env.NODE_ENV === "production", // in local dev over http, this will be false
+    sameSite: process.env.NODE_ENV === "production" ? "lax" : "lax", // use "none" only if truly cross-site with HTTPS
+    maxAge: COOKIE_MAX_AGE_MS,
+    path: "/",
+  });
+}
+
+function clearAuthCookie(res) {
+  res.clearCookie(COOKIE_NAME, {
+    httpOnly: true,
+    sameSite: process.env.NODE_ENV === "production" ? "lax" : "lax",
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    path: "/",
   });
 }
 
@@ -71,7 +83,7 @@ export async function requireAuth(req, res, next) {
   try {
     const hdr = req.headers.authorization || "";
     const bearer = hdr.startsWith("Bearer ") ? hdr.slice(7) : null;
-    const token = bearer || req.cookies?.token;
+    const token = bearer || req.cookies?.[COOKIE_NAME];
     if (!token) return res.status(401).json({ error: "unauthorized" });
 
     const payload = jwt.verify(token, JWT_SECRET);
@@ -104,7 +116,7 @@ const sensitiveLimiter = rateLimit({
 /**
  * POST /api/auth/register
  * body: { email, password, displayName, handle? }
- * returns: { token, user }
+ * returns: { token?, user }
  */
 router.post("/register", sensitiveLimiter, async (req, res, next) => {
   try {
@@ -124,11 +136,14 @@ router.post("/register", sensitiveLimiter, async (req, res, next) => {
       !(/[A-Za-z]/.test(password) && /\d/.test(password))
     ) {
       return res.status(400).json({
-        error: "password must be at least 8 chars and include letters and numbers",
+        error:
+          "password must be at least 8 chars and include letters and numbers",
       });
     }
     if (!validator.isLength(displayName, { min: 2, max: 60 })) {
-      return res.status(400).json({ error: "displayName must be 2–60 characters" });
+      return res
+        .status(400)
+        .json({ error: "displayName must be 2–60 characters" });
     }
 
     // Resolve unique handle
@@ -154,14 +169,18 @@ router.post("/register", sensitiveLimiter, async (req, res, next) => {
     await user.save().catch((err) => {
       if (err?.code === 11000) {
         const field = Object.keys(err.keyPattern || {})[0] || "field";
-        return Promise.reject(
-          Object.assign(new Error(`${field} already in use`), { status: 409 })
-        );
+        const e = new Error(`${field} already in use`);
+        e.status = 409;
+        throw e;
       }
-      return Promise.reject(err);
+      throw err;
     });
 
-    const token = signJwt({ sub: user._id.toString(), h: user.handle, typ: "access" });
+    const token = signJwt({
+      sub: user._id.toString(),
+      h: user.handle,
+      typ: "access",
+    });
     setAuthCookie(res, token);
 
     return res.status(201).json({
@@ -176,7 +195,7 @@ router.post("/register", sensitiveLimiter, async (req, res, next) => {
 /**
  * POST /api/auth/login
  * body: { email, password } OR { handle, password }
- * returns: { token, user }
+ * returns: { token?, user }
  */
 router.post("/login", authLimiter, async (req, res, next) => {
   try {
@@ -201,7 +220,13 @@ router.post("/login", authLimiter, async (req, res, next) => {
 
     if (!ok) return res.status(401).json({ error: "invalid credentials" });
 
-    const token = signJwt({ sub: user._id.toString(), h: user.handle, typ: "access" });
+    const token = signJwt({
+      sub: user._id.toString(),
+      h: user.handle,
+      typ: "access",
+    });
+
+    // Use the same single path for cookie auth
     setAuthCookie(res, token);
 
     return res.json({
@@ -228,11 +253,7 @@ router.get("/me", requireAuth, async (req, res) => {
  */
 router.post("/logout", (req, res) => {
   if (USE_AUTH_COOKIE) {
-    res.clearCookie("token", {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-    });
+    clearAuthCookie(res);
   }
   return res.json({ success: true });
 });

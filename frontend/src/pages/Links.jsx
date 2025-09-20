@@ -1,8 +1,10 @@
+// Links.jsx / Links.tsx
 import React, { useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { MdDelete } from "react-icons/md";
 import { FaGlobe, FaTwitter, FaLinkedin, FaYoutube } from "react-icons/fa";
 import { TbDots } from "react-icons/tb";
+import { listMyLinks, saveMyLinksBulk } from "../../lib/api";
 
 const OPTIONS = [
   { value: "website",  label: "Website",  Icon: FaGlobe },
@@ -21,7 +23,8 @@ const URL_PLACEHOLDER = {
 };
 
 export const Links = () => {
-  const { links, addLink, removeLink, updateLink } = useOutletContext();
+  // Expected context shape: { links, addLink, removeLink, updateLink, replaceLinks? }
+  const { links, addLink, removeLink, updateLink, replaceLinks } = useOutletContext();
 
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState(null); // { type: 'success'|'error', msg: string }
@@ -30,24 +33,30 @@ export const Links = () => {
     setSaving(true);
     setStatus(null);
     try {
-      // Persist locally
+      // Persist locally as a fallback
       localStorage.setItem("links", JSON.stringify(links));
 
-      // --- Optional: save to your backend ---
-      // const API = "http://localhost:4000";
-      // const token = localStorage.getItem("token");
-      // await fetch(`${API}/api/links/bulk`, {
-      //   method: "PUT",
-      //   headers: {
-      //     "Content-Type": "application/json",
-      //     Authorization: `Bearer ${token}`,
-      //   },
-      //   body: JSON.stringify({ links }),
-      // });
+      // Save on server (uses axios instance with Authorization header)
+      await saveMyLinksBulk(links);
+
+      // Optional: refetch latest sorted/sanitized links from server
+      try {
+        const { data } = await listMyLinks();
+        if (replaceLinks && Array.isArray(data?.links)) {
+          replaceLinks(data.links);
+        }
+      } catch {
+        // ignore refetch errors; the primary PUT already succeeded
+      }
 
       setStatus({ type: "success", msg: "Links saved!" });
     } catch (e) {
-      setStatus({ type: "error", msg: e?.message || "Failed to save" });
+      const msg =
+        e?.response?.data?.error ||
+        e?.response?.data?.message ||
+        e?.message ||
+        "Failed to save";
+      setStatus({ type: "error", msg });
     } finally {
       setSaving(false);
     }
@@ -72,12 +81,13 @@ export const Links = () => {
       </div>
 
       <div>
-        {links.map((item) => {
+        {links.map((item, idx) => {
           const selected = OPTIONS.find((o) => o.value === item.type);
           const Icon = selected?.Icon || TbDots;
+          const key = item.id || item._id || `link-${idx}`;
 
           return (
-            <div key={item.id} className="border p-5 mt-5 rounded">
+            <div key={key} className="border p-5 mt-5 rounded">
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-2">
                   <Icon className="text-xl" />
@@ -88,7 +98,7 @@ export const Links = () => {
 
                 <button
                   type="button"
-                  onClick={() => removeLink(item.id)}
+                  onClick={() => removeLink(item.id || item._id)}
                   className="p-1 rounded hover:bg-red-50"
                   title="Remove link"
                   aria-label="Remove link"
@@ -101,11 +111,11 @@ export const Links = () => {
               <div className="mt-4">
                 <label className="block mb-2">Link Type</label>
                 <select
-                  value={item.type}
+                  value={item.type || ""}
                   onChange={(e) => {
                     const type = e.target.value;
                     const opt = OPTIONS.find((o) => o.value === type);
-                    updateLink(item.id, {
+                    updateLink(item.id || item._id, {
                       type,
                       name: type === "custom" ? item.name : (opt?.label || ""),
                     });
@@ -125,8 +135,10 @@ export const Links = () => {
                   <label className="block mb-2">Custom Name</label>
                   <input
                     type="text"
-                    value={item.name}
-                    onChange={(e) => updateLink(item.id, { name: e.target.value })}
+                    value={item.name || ""}
+                    onChange={(e) =>
+                      updateLink(item.id || item._id, { name: e.target.value })
+                    }
                     className="border p-2 w-full rounded"
                     placeholder="Enter custom link name"
                   />
@@ -138,8 +150,10 @@ export const Links = () => {
                 <label className="block mb-2">Link URL</label>
                 <input
                   type="url"
-                  value={item.url}
-                  onChange={(e) => updateLink(item.id, { url: e.target.value })}
+                  value={item.url || ""}
+                  onChange={(e) =>
+                    updateLink(item.id || item._id, { url: e.target.value })
+                  }
                   className="border p-2 w-full rounded"
                   placeholder={URL_PLACEHOLDER[item.type] || "https://your-link"}
                 />
@@ -159,7 +173,13 @@ export const Links = () => {
             {saving ? "Saving..." : "Save"}
           </button>
           {status && (
-            <span className={status.type === "success" ? "text-green-600 text-sm" : "text-red-600 text-sm"}>
+            <span
+              className={
+                status.type === "success"
+                  ? "text-green-600 text-sm"
+                  : "text-red-600 text-sm"
+              }
+            >
               {status.msg}
             </span>
           )}

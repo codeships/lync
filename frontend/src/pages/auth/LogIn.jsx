@@ -1,7 +1,7 @@
 import { useState } from "react";
 import Logo from "../../assets/logo.png";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { login } from "../../../lib/api.js";
+import { login, setAuthToken } from "../../../lib/api";
 import { Eye, EyeOff } from "lucide-react";
 
 export const LogIn = () => {
@@ -16,41 +16,59 @@ export const LogIn = () => {
   const [showPass, setShowPass] = useState(true);
   const [showUser, setShowUser] = useState(true);
 
+
   const loginWithMail = async (e) => {
-    e.preventDefault();
-    if (!email || !pass) return;
-    setLoading(true);
-    setMsg("");
+  e.preventDefault();
+  if (!email || !pass) return;
 
-    try {
-      const payload = {
-        email,
-        password: pass,
-        ...(displayname ? { displayName: displayname } : {}),
-      };
+  setLoading(true);
+  setMsg("");
 
-      const out = await login(payload);
-      // Helpful once while debugging (then remove):
-      console.log('login() raw response:', out);
+  try {
+    // Build the payload with email, password, and optional displayName
+    const payload = {
+      email,
+      password: pass,
+      ...(displayname ? { displayName: displayname } : {}),
+    };
 
-      // Normalize: accept { token, user } OR { data: { token, user } } OR { accessToken }
-      const data = out?.data ?? out ?? {};
-      const token = data.token ?? data.accessToken ?? data.jwt ?? null;
-      const user  = data.user  ?? data.profile    ?? null;
+    const out = await login(payload);
 
-      if (token) localStorage.setItem('token', token);
-      if (user)  localStorage.setItem('me', JSON.stringify(user));
+    // Support multiple API response shapes
+    const data  = out?.data ?? out ?? {};
+    const token = data.token ?? data.accessToken ?? data.jwt ?? null;
+    const user  = data.user  ?? data.profile     ?? null;
 
-      navigate(location.state?.from || "/dashboard");
-    } catch (err) {
-      const apiMsg =
-        err?.message ||
-        "Login failed. Please try again.";
-      setMsg(apiMsg);
-    } finally {
-      setLoading(false);
+    if (!token) {
+      throw new Error("No token returned from server");
     }
-  };
+
+    // Persist token via shared helper (so axios adds Authorization header automatically)
+    setAuthToken(token);
+
+    if (user) {
+      localStorage.setItem("me", JSON.stringify(user));
+    } else {
+      localStorage.removeItem("me"); // clear old data if no user returned
+    }
+
+    // Navigate to dashboard or original protected route
+    navigate(location.state?.from || "/dashboard");
+  } catch (err) {
+    const apiMsg =
+      err?.response?.data?.error ||
+      err?.response?.data?.message ||
+      err?.message ||
+      "Login failed. Please try again.";
+    setMsg(apiMsg);
+
+    // Clear stale token/user on failure
+    setAuthToken(null);
+    localStorage.removeItem("me");
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div>
