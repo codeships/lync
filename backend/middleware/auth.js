@@ -100,26 +100,11 @@ export function signAuthTokens(userId) {
  * @returns {string|null} The extracted token or null if not found
  */
 export function getTokenFromRequest(req) {
-  // Check Authorization header first
-  const header = req.headers.authorization || "";
-  let token = sanitizeToken(header);
+  // Check Authorization header first Bareer token
+  const token = (req.headers.authorization || "").split(' ')[1];
+  // let token = sanitizeToken(header);
 
-  // Check other possible locations
-  const potentialSources = [
-    () => req.cookies?.token,
-    () => req.cookies?.access_token,
-    () => req.headers["x-access-token"],
-    () => req.query?.token
-  ];
-
-  for (const source of potentialSources) {
-    if (!token) {
-      const value = source();
-      if (value) token = sanitizeToken(String(value));
-    }
-  }
-
-  if (token && !looksLikeJWT(token)) return null;
+  
   return token || null;
 }
 
@@ -250,6 +235,32 @@ export function authRequired(req, res, next) {
     next(error);
   }
 }
+
+
+export function authsRequired(req, res, next) {
+  const header = req.headers.authorization || "";
+  if (!header.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Missing token" });
+  }
+  const token = header.slice(7).trim();
+  if (!token || token === "null" || token === "undefined") {
+    return res.status(401).json({ error: "Missing token" });
+  }
+
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET, {
+      audience: process.env.JWT_AUDIENCE,   // <-- must match signing
+      issuer: process.env.JWT_ISSUER,       // <-- must match signing
+      algorithms: ["HS256"],
+    });
+    req.user = { id: payload.sub, email: payload.email, role: payload.role };
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: `JWT Error: ${err.message}` });
+  }
+}
+
+
 
 /**
  * Creates authentication middleware that loads user from database
@@ -403,8 +414,24 @@ export function authErrorHandler(err, req, res, next) {
   next(err);
 }
 
+export function signToken(user) {
+  return jwt.sign(
+    { email: user.email, role: user.role },
+    process.env.JWT_SECRET,
+    {
+      algorithm: "HS256",
+      expiresIn: process.env.JWT_EXPIRES_IN || "1h",
+      subject: String(user._id),
+      audience: process.env.JWT_AUDIENCE, // <-- add this
+      issuer: process.env.JWT_ISSUER,     // <-- and this (optional but recommended)
+    }
+  );
+}
+
 /* ----------------------------- Export ----------------------------- */
 export default {
+  authsRequired,
+  signToken,
   signAuthToken,
   signAuthTokens,
   getTokenFromRequest,

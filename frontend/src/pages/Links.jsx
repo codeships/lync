@@ -37,11 +37,12 @@ export const Links = () => {
       localStorage.setItem("links", JSON.stringify(links));
 
       // Save on server (uses axios instance with Authorization header)
-      await saveMyLinksBulk(links);
+      const token = localStorage.getItem("token");
+      await saveMyLinksBulk(links, token);
 
       // Optional: refetch latest sorted/sanitized links from server
       try {
-        const { data } = await listMyLinks();
+        const { data } = await listMyLinks(token);
         if (replaceLinks && Array.isArray(data?.links)) {
           replaceLinks(data.links);
         }

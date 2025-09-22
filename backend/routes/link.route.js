@@ -1,7 +1,8 @@
+// routes/links.js (ESM)
 import { Router } from "express";
 import mongoose from "mongoose";
 import Link from "../models/Link.js";
-import { authRequired, optionalAuth } from "../middleware/auth.js";
+import { authsRequired /*, optionalAuth*/ } from "../middleware/auth.js";
 
 const router = Router();
 
@@ -12,7 +13,8 @@ const MAX_LIMIT = 100;
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 const authedUserId = (req) => {
-  return String(req.userId || req.user?._id || "");
+  // Expect middleware to set req.user = { id, email, role }
+  return String(req.user?.id || req.userId || "");
 };
 
 const assertAuthed = (req, res) => {
@@ -42,47 +44,36 @@ const toInt = (v, def = 0) => {
 
 const beginSession = async () => {
   try {
-    const session = await mongoose.startSession();
-    return session;
+    return await mongoose.startSession();
   } catch {
     return null;
   }
 };
 
-// Enhanced debug middleware to check authentication
-const debugAuth = (req, res, next) => {
-  console.log('Auth debug:', {
+// Debug middleware to inspect auth state early
+const debugAuth = (req, _res, next) => {
+  console.log("Auth debug:", {
     hasUserId: !!req.userId,
     hasUser: !!req.user,
-    userId: req.userId,
+    userId: req.userId || req.user?.id,
     method: req.method,
     path: req.path,
-    authHeader: req.headers.authorization ? 'present' : 'missing',
-    cookies: req.cookies ? Object.keys(req.cookies) : 'none'
+    authHeader: req.headers.authorization ? "present" : "missing",
+    cookies: req.cookies ? Object.keys(req.cookies) : "none",
   });
-  
-  // If we don't have user info but have an auth header, try to manually verify
-  if (!req.userId && req.headers.authorization) {
-    const authHeader = req.headers.authorization;
-    console.log('Authorization header content:', authHeader);
-    
-    // Check if it's a Bearer token
-    if (authHeader.startsWith('Bearer ')) {
-      const token = authHeader.substring(7);
-      console.log('Extracted token (first 10 chars):', token.substring(0, 10) + '...');
-    }
+
+  if (!req.user && req.headers.authorization?.startsWith("Bearer ")) {
+    const token = req.headers.authorization.slice(7);
+    console.log("Extracted token (first 10):", token.substring(0, 10) + "...");
   }
-  
   next();
 };
 
 /* ============================ ROUTES ============================ */
 
-// Apply debug middleware first to see what's happening
+// Run debug, then require auth for all routes in this router
 router.use(debugAuth);
-
-// Then apply authentication to all routes
-router.use(authRequired);
+router.use(authsRequired);
 
 /** GET /me — list links (with pagination) */
 router.get("/me", async (req, res, next) => {
@@ -93,10 +84,13 @@ router.get("/me", async (req, res, next) => {
     const limit = Math.min(Math.max(toInt(req.query.limit, 50), 1), MAX_LIMIT);
     const skip = Math.max(toInt(req.query.skip, 0), 0);
 
-    // Optional: simple title filter (?q=foo)
     const q = (req.query.q || "").toString().trim();
     const filter = { user: uid };
-    if (q) filter.title = { $regex: q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" };
+    if (q) {
+      // Escape regex specials
+      const safe = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      filter.title = { $regex: safe, $options: "i" };
+    }
 
     const [items, total] = await Promise.all([
       Link.find(filter).sort({ order: 1, createdAt: 1 }).skip(skip).limit(limit).lean(),
@@ -125,8 +119,8 @@ router.post("/me", async (req, res, next) => {
     const uid = authedUserId(req);
 
     const { title, url, isActive } = req.body || {};
-
     const t = normalizeTitle(title);
+
     if (!t || t.length > MAX_TITLE_LEN) {
       return res.status(400).json({ error: `title is required (max ${MAX_TITLE_LEN} chars)` });
     }
@@ -137,7 +131,6 @@ router.post("/me", async (req, res, next) => {
       return res.status(400).json({ error: "isActive must be boolean" });
     }
 
-    // Next order = max(order)+1 for this user
     const last = await Link.findOne({ user: uid }).sort({ order: -1 }).select({ order: 1 }).lean();
     const nextOrder = (last?.order ?? -1) + 1;
 
@@ -207,7 +200,7 @@ router.delete("/me/:id", async (req, res, next) => {
     const deleted = await Link.findOneAndDelete({ _id: id, user: uid });
     if (!deleted) return res.status(404).json({ error: "Link not found" });
 
-    res.status(204).send(); // No Content
+    res.status(204).send();
   } catch (err) {
     next(err);
   }
@@ -227,17 +220,11 @@ router.post("/me/reorder", async (req, res, next) => {
     }
 
     for (const it of items) {
-      if (
-        !it ||
-        !isValidObjectId(it.id) ||
-        !Number.isInteger(it.order) ||
-        it.order < 0
-      ) {
+      if (!it || !isValidObjectId(it.id) || !Number.isInteger(it.order) || it.order < 0) {
         return res.status(400).json({ error: "Each item must have valid {id, order>=0 integer}" });
       }
     }
 
-    // Optional: ensure all IDs belong to this user before writing
     const ids = items.map((i) => i.id);
     const ownedCount = await Link.countDocuments({ _id: { $in: ids }, user: uid });
     if (ownedCount !== ids.length) {
@@ -245,6 +232,7 @@ router.post("/me/reorder", async (req, res, next) => {
     }
 
     const session = await beginSession();
+
     const run = async () => {
       const ops = items.map(({ id, order }) => ({
         updateOne: {
@@ -254,10 +242,11 @@ router.post("/me/reorder", async (req, res, next) => {
       }));
       if (ops.length) await Link.bulkWrite(ops, { ordered: false, ...(session && { session }) });
 
-      // Normalize orders to 0..n-1 after updates to avoid duplicates/gaps
+      // Normalize to 0..n-1 to avoid duplicates/gaps
       const current = await Link.find({ user: uid }, null, session ? { session } : {})
         .sort({ order: 1, createdAt: 1 })
-        .select({ _id: 1 }).lean();
+        .select({ _id: 1 })
+        .lean();
 
       const normalizeOps = current.map((doc, idx) => ({
         updateOne: {
@@ -265,7 +254,8 @@ router.post("/me/reorder", async (req, res, next) => {
           update: { $set: { order: idx } },
         },
       }));
-      if (normalizeOps.length) await Link.bulkWrite(normalizeOps, { ordered: true, ...(session && { session }) });
+      if (normalizeOps.length)
+        await Link.bulkWrite(normalizeOps, { ordered: true, ...(session && { session }) });
 
       return Link.find({ user: uid }, null, session ? { session } : {})
         .sort({ order: 1, createdAt: 1 })
@@ -274,7 +264,9 @@ router.post("/me/reorder", async (req, res, next) => {
 
     if (session) {
       let result;
-      await session.withTransaction(async () => { result = await run(); });
+      await session.withTransaction(async () => {
+        result = await run();
+      });
       await session.endSession();
       return res.json(result);
     } else {
@@ -323,7 +315,7 @@ router.put("/me/bulk", async (req, res, next) => {
         title: normalizeTitle(l.title),
         url: String(l.url).trim(),
         isActive: l.isActive !== false,
-        order: idx, // normalize order
+        order: idx,
       }));
 
       if (docs.length) {
@@ -337,7 +329,9 @@ router.put("/me/bulk", async (req, res, next) => {
 
     if (session) {
       let result;
-      await session.withTransaction(async () => { result = await run(); });
+      await session.withTransaction(async () => {
+        result = await run();
+      });
       await session.endSession();
       return res.status(200).json(result);
     } else {
@@ -349,16 +343,16 @@ router.put("/me/bulk", async (req, res, next) => {
   }
 });
 
-// Add a test endpoint to debug authentication
+// Quick endpoint to verify auth wiring
 router.get("/debug-auth", (req, res) => {
   res.json({
-    authenticated: !!req.userId,
-    userId: req.userId,
-    user: req.user,
+    authenticated: !!(req.user?.id || req.userId),
+    userId: req.user?.id || req.userId || null,
+    user: req.user || null,
     headers: {
       authorization: req.headers.authorization || "Not provided",
-      cookieKeys: req.cookies ? Object.keys(req.cookies) : "No cookies"
-    }
+      cookieKeys: req.cookies ? Object.keys(req.cookies) : "No cookies",
+    },
   });
 });
 

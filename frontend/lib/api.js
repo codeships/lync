@@ -22,11 +22,11 @@ const storage = {
     try {
       if (val == null) window.localStorage.removeItem(key);
       else window.localStorage.setItem(key, val);
-    } catch { /* noop */ }
+    } catch {}
   },
   remove(key) {
     if (!canUseStorage) return;
-    try { window.localStorage.removeItem(key); } catch { /* noop */ }
+    try { window.localStorage.removeItem(key); } catch {}
   },
 };
 
@@ -41,7 +41,7 @@ export const api = axios.create({
     Accept: "application/json",
   },
   // If you switch to cookie sessions, uncomment:
-   withCredentials: true,
+  // withCredentials: true,
 });
 
 /* -------- Token helpers -------- */
@@ -53,7 +53,6 @@ export const setAuthToken = (token) => {
 export const getAuthToken = () => storage.get(TOKEN_KEY);
 
 /* -------- Interceptors -------- */
-// Attach Authorization header if not already set for this request
 api.interceptors.request.use((config) => {
   const token = getAuthToken();
   if (token && !config.headers?.Authorization) {
@@ -63,14 +62,12 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Optional: auto-clear auth on 401 (except login/register calls)
 api.interceptors.response.use(
   (res) => res,
   (err) => {
     const status = err?.response?.status;
     const url = err?.config?.url || "";
     const isAuthEndpoint = /\/api\/auth\/(login|register)/.test(url);
-
     if (status === 401 && !isAuthEndpoint) {
       setAuthToken(null);
       storage.remove("me");
@@ -88,7 +85,13 @@ export const getMyProfile = () => api.get("/api/profile/me");
 export const updateMyProfile = (payload) => api.put("/api/profile/me", payload);
 
 // Links (private)
-export const listMyLinks = () => api.get("/api/links/me");
+export const listMyLinks = () => {
+  const token = localStorage.getItem("token");
+
+  api.get("/api/links/me", {
+    headers: { Authorization: `Bearer ${token}` }
+  })
+};
 export const createMyLink = (payload) => api.post("/api/links/me", payload);
 export const deleteMyLink = (id) => api.delete(`/api/links/me/${id}`);
 export const toggleLink = (id, isActive) =>
@@ -96,9 +99,14 @@ export const toggleLink = (id, isActive) =>
 export const reorderLinks = (items) =>
   api.post(`/api/links/me/reorder`, { items });
 
-// ✅ Bulk replace links
-export const saveMyLinksBulk = (links) =>
-  api.put(`/api/links/me/bulk`, { links });
+export const saveMyLinksBulk = (links) => {
+  const token = localStorage.getItem("token");
+
+  api.put(`/api/links/me/bulk`, { links }, {
+    headers:{ Authorization:`Bearer ${token}`}
+  })
+};
+
 
 // Public page
 export const getPublicProfile = (handle) =>
@@ -112,9 +120,9 @@ export const register = (payload) => api.post("/api/auth/register", payload);
  * Returns { token, user? } (whatever your backend sends).
  */
 export const login = async (body) => {
-  const res = await api.post("/api/auth/login", body);
+  const res = await api.post("/api/auth/login", body); // <-- no Authorization here
   const data = res.data;
-  if (data?.token) setAuthToken(data.token);
+  if (data?.token) setAuthToken(data.token); // <-- save it
   return data;
 };
 
@@ -124,3 +132,4 @@ export const logout = () => {
   storage.remove("me");
   return Promise.resolve();
 };
+
