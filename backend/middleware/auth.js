@@ -73,8 +73,8 @@ export function signAuthToken(userId, opts = {}) {
     {
       algorithm: JWT_ALG,
       expiresIn: opts.expiresIn || (opts.tokenType === "refresh" ? JWT_REFRESH_EXPIRES_IN : JWT_EXPIRES_IN),
-      issuer: JWT_ISSUER,
-      audience: JWT_AUDIENCE,
+      aud: process.env.AUDIENCE,
+      iss: process.env.ISSUER,
       ...opts.sign // allow low-level overrides if needed
     }
   );
@@ -249,8 +249,8 @@ export function authsRequired(req, res, next) {
 
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET, {
-      audience: process.env.JWT_AUDIENCE,   // <-- must match signing
-      issuer: process.env.JWT_ISSUER,       // <-- must match signing
+      aud: process.env.JWT_AUDIENCE,   // <-- must match signing
+      iss: process.env.JWT_ISSUER,       // <-- must match signing
       algorithms: ["HS256"],
     });
     req.user = { id: payload.sub, email: payload.email, role: payload.role };
@@ -422,8 +422,8 @@ export function signToken(user) {
       algorithm: "HS256",
       expiresIn: process.env.JWT_EXPIRES_IN || "1h",
       subject: String(user._id),
-      audience: process.env.JWT_AUDIENCE, // <-- add this
-      issuer: process.env.JWT_ISSUER,     // <-- and this (optional but recommended)
+      aud: process.env.JWT_AUDIENCE, // <-- add this
+      iss: process.env.JWT_ISSUER,     // <-- and this (optional but recommended)
     }
   );
 }

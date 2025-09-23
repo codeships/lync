@@ -4,7 +4,7 @@ import express from 'express';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
-
+import path from "path";
 import authRoutes from './routes/auth.route.js';
 import profileRoutes from './routes/profile.route.js';
 import linksRoutes from './routes/link.route.js';
@@ -56,6 +56,8 @@ app.use(morgan('dev'));
 app.get('/health', (_req, res) => res.json({ ok: true, env: NODE_ENV }));
 // Optional: quick check to see if cookies arrive cross-site
 app.get('/debug/cookies', (req, res) => res.json({ cookies: req.cookies || {} }));
+
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 /* ---------------------- Routes -------------------------- */
 app.use('/api/auth', authRoutes);

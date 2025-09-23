@@ -291,19 +291,37 @@ router.put("/me/bulk", async (req, res, next) => {
       return res.status(400).json({ error: "links must be an array" });
     }
 
-    // Validate each link
-    for (const [idx, l] of links.entries()) {
-      const t = normalizeTitle(l?.title || "");
-      if (!t || t.length > MAX_TITLE_LEN) {
-        return res.status(400).json({ error: `Link at index ${idx} has invalid title` });
-      }
-      if (!validateUrl(l?.url || "")) {
-        return res.status(400).json({ error: `Link at index ${idx} has invalid URL` });
-      }
-      if (l?.isActive != null && typeof l.isActive !== "boolean") {
-        return res.status(400).json({ error: `Link at index ${idx} has invalid isActive` });
-      }
-    }
+  // routes/links.js -> PUT /me/bulk
+// replace the validation loop with:
+for (const [idx, l] of links.entries()) {
+  const rawTitle = (l?.title ?? l?.name ?? "").toString().trim();
+  const rawUrl = (l?.url ?? "").toString().trim();
+  if (!rawTitle || rawTitle.length > MAX_TITLE_LEN) {
+    return res.status(400).json({ error: `Link at index ${idx} has invalid title` });
+  }
+  try {
+    const u = new URL(/^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`);
+    if (u.protocol !== "http:" && u.protocol !== "https:") throw new Error();
+  } catch {
+    return res.status(400).json({ error: `Link at index ${idx} has invalid URL` });
+  }
+  if (l?.isActive != null && typeof l.isActive !== "boolean") {
+    return res.status(400).json({ error: `Link at index ${idx} has invalid isActive` });
+  }
+}
+
+// when creating docs:
+const docs = links.map((l, idx) => {
+ const uid = req.user.id; // string of ObjectId is fine; Mongoose will cast
+const docs = links.map((l, idx) => ({
+  user: uid,                       // <-- Mongoose casts to ObjectId
+  title: l.title.trim(),
+  url: l.url.trim(),
+  isActive: l.isActive !== false,
+  order: idx,
+}));
+
+});
 
     const session = await beginSession();
 

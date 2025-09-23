@@ -1,88 +1,44 @@
+// routes/public.js
 import { Router } from "express";
 import mongoose from "mongoose";
 import User from "../models/User.js";
 import Link from "../models/Link.js";
 
 const router = Router();
+const isOid = (v) => mongoose.Types.ObjectId.isValid(String(v || ""));
 
-const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
-const HANDLE_RE = /^[a-z0-9_-]{2,30}$/;
-const isHttpUrl = (u) => {
+/** GET /api/public/:handleOrId */
+router.get("/:handleOrId", async (req, res, next) => {
   try {
-    const x = new URL(u);
-    return x.protocol === "http:" || x.protocol === "https:";
-  } catch {
-    return false;
-  }
-};
+    const key = String(req.params.handleOrId || "").trim().toLowerCase();
+    if (!key) return res.status(400).json({ error: "Invalid parameter" });
 
-// IMPORTANT: define redirect route BEFORE /:handle
-router.get("/r/:handle/:linkId", async (req, res, next) => {
-  try {
-    const handle = (req.params.handle || "").toLowerCase().trim();
-    if (!HANDLE_RE.test(handle)) return res.status(400).send("Bad handle");
-    if (!isValidObjectId(req.params.linkId)) return res.status(404).send("Not found");
+    const user = await (isOid(key)
+      ? User.findById(key).select({ _id:1, handle:1, firstName:1, lastName:1, avatarUrl:1, bio:1 }).lean()
+      : User.findOne({ handle: key }).select({ _id:1, handle:1, firstName:1, lastName:1, avatarUrl:1, bio:1 }).lean()
+    );
 
-    const user = await User.findOne({ handle }).select({ _id: 1, privacy: 1 }).lean();
-    if (!user) return res.status(404).send("Not found");
-    if (user.privacy === "private") return res.status(403).send("Profile is private");
+    if (!user) return res.status(404).json({ error: "User not found" });
 
-    const link = await Link.findOne({
-      _id: req.params.linkId,
-      user: user._id,
-      isActive: true,
-    }).select({ url: 1 }).lean();
-
-    if (!link) return res.status(404).send("Not found");
-    if (!isHttpUrl(link.url)) return res.status(400).send("Invalid URL");
-
-    // increment clicks in background; don't block redirect
-    Link.updateOne({ _id: req.params.linkId }, { $inc: { clicks: 1 } })
-      .catch((e) => console.error("click inc failed:", e.message));
-
-    res.redirect(link.url);
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.get("/:handle", async (req, res, next) => {
-  try {
-    const handle = (req.params.handle || "").toLowerCase().trim();
-    if (!HANDLE_RE.test(handle)) {
-      return res.status(400).json({ error: "Invalid handle" });
-    }
-
-    // Allow-list public fields only
-    const user = await User.findOne({ handle })
-      .select({
-        _id: 1,
-        handle: 1,
-        displayName: 1,
-        avatarUrl: 1,
-        bio: 1,
-        theme: 1,
-        socials: 1,
-        privacy: 1,
-      })
-      .lean();
-
-    if (!user) return res.status(404).json({ error: "Profile not found" });
-    if (user.privacy === "private") {
-      return res.status(403).json({ error: "Profile is private" });
-    }
-
-    const isUnlisted = user.privacy === "unlisted";
-
+    // IMPORTANT: make sure Link.user type matches (ObjectId vs string)
     const links = await Link.find({ user: user._id, isActive: true })
       .sort({ order: 1, createdAt: 1 })
-      .select({ _id: 1, title: 1, url: 1, order: 1 }) // exclude user/clicks
+      .select({ title:1, url:1, isActive:1, order:1 })
       .lean();
 
-    res.json({ user: { ...user, isUnlisted }, links });
-  } catch (err) {
-    next(err);
-  }
+    res.json({
+      profile: {
+        id: String(user._id),
+        handle: user.handle || "",
+        firstName: user.firstName || "",
+        lastName: user.lastName || "",
+        fullName: [user.firstName, user.lastName].filter(Boolean).join(" "),
+        avatarUrl: user.avatarUrl || "",
+        bio: user.bio || "",
+      },
+      links,
+    });
+  } catch (e) { next(e); }
 });
 
 export default router;

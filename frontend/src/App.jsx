@@ -1,29 +1,36 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import Home from './pages/Home';
-import { SignUp } from './pages/auth/SignUp';
-import { LogIn } from './pages/auth/Login';
-import axios from "axios";
-import { Dashboard } from './pages/Dashboard';
-import { Profile } from './pages/Profile';
-import { Links } from './pages/Links';
+// App.jsx
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import Home from "./pages/Home";
+import { SignUp } from "./pages/auth/SignUp";
+import { LogIn } from "./pages/auth/Login";
+import { Dashboard } from "./pages/Dashboard";   // keep as named if your file exports named
+import Profile from "./pages/Profile";           // <-- default import (fixes your error)
+import { Links } from "./pages/Links";
 
-    function App() {
-      return (
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/signup" element={<SignUp />} />
-            <Route path="/login" element={<LogIn />} />
-            <Route path="/dashboard" element={<Dashboard />}>
-              <Route index element={<Navigate to="links" replace />} />
-              <Route path="links" element={<Links />} />
-              <Route path="profile" element={<Profile />} />
-              <Route />
-            </Route>
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        {/* Public routes */}
+        <Route path="/" element={<Home />} />
+        <Route path="/signup" element={<SignUp />} />
+        <Route path="/login" element={<LogIn />} />
 
-          </Routes>
-        </BrowserRouter>
-      );
-    }
+        {/* Public shareable profile: https://site.com/@yourhandle */}
+        <Route path="/@:handle" element={<Profile />} />
 
-    export default App;
+        {/* Private dashboard */}
+        <Route path="/dashboard" element={<Dashboard />}>
+          <Route index element={<Navigate to="links" replace />} />
+          <Route path="links" element={<Links />} />
+          
+        </Route>
+
+        {/* (optional) 404 fallback */}
+        {/* <Route path="*" element={<Navigate to="/" replace />} /> */}
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+export default App;

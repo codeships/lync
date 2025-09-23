@@ -81,17 +81,22 @@ api.interceptors.response.use(
 export const pingHealth = () => api.get("/api/health");
 
 // Profile (private)
+// Update profile names
+export const updateMyProfile = (payload) =>
+  api.patch("/api/profile/me", payload);
+
+// Get profile (optional for refresh)
 export const getMyProfile = () => api.get("/api/profile/me");
-export const updateMyProfile = (payload) => api.put("/api/profile/me", payload);
+export const uploadAvatar = (file) => {
+  const fd = new FormData();
+  fd.append("avatar", file);
+  return api.post("/api/profile/avatar", fd, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+};
+
 
 // Links (private)
-export const listMyLinks = () => {
-  const token = localStorage.getItem("token");
-
-  api.get("/api/links/me", {
-    headers: { Authorization: `Bearer ${token}` }
-  })
-};
 export const createMyLink = (payload) => api.post("/api/links/me", payload);
 export const deleteMyLink = (id) => api.delete(`/api/links/me/${id}`);
 export const toggleLink = (id, isActive) =>
@@ -99,13 +104,49 @@ export const toggleLink = (id, isActive) =>
 export const reorderLinks = (items) =>
   api.post(`/api/links/me/reorder`, { items });
 
-export const saveMyLinksBulk = (links) => {
-  const token = localStorage.getItem("token");
+// lib/api.js (or inside Links.jsx before calling saveMyLinksBulk)
 
-  api.put(`/api/links/me/bulk`, { links }, {
-    headers:{ Authorization:`Bearer ${token}`}
-  })
+const OPTION_LABEL = {
+  website: "Website",
+  twitter: "Twitter",
+  linkedin: "LinkedIn",
+  youtube: "YouTube",
+  custom: "Custom",
 };
+
+const ensureHttpUrl = (s = "") => {
+  const t = String(s).trim();
+  if (!t) return "";
+  if (/^https?:\/\//i.test(t)) return t;
+  // auto-prefix if user typed "twitter.com/..."
+  return `https://${t}`;
+};
+
+const toBulkPayload = (links = []) =>
+  links
+    // skip rows with no URL
+    .filter(l => (l.url || "").trim())
+    .map((l, idx) => ({
+      title:
+        (l.name || "").trim() ||
+        OPTION_LABEL[l.type] ||
+        `Link ${idx + 1}`,
+      url: ensureHttpUrl(l.url),
+      isActive: l.isActive !== false,
+    }));
+
+
+export const listMyLinks = (token, { limit=50, skip=0, q="" } = {}) =>
+  api.get("/api/links/me", {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    params: { limit, skip, q }
+  });
+
+export const saveMyLinksBulk = (links, token) =>
+  api.put("/api/links/me/bulk", { links }, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {}
+  });
+
 
 
 // Public page

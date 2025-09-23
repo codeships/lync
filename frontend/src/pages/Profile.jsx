@@ -1,123 +1,105 @@
-import React, { useState } from "react";
-import { useOutletContext } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useParams } from "react-router-dom";
+import { getPublicProfile } from "../../lib/api.js"; // adjust path
 
-export const Profile = () => {
-  const {
-    image,
-    selectedFile, setSelectedFile,
-    firstName, setFirstName,
-    lastName, setLastName,
-  } = useOutletContext();
+const siteBase = () => {
+  try { return window.location.origin; } catch { return ""; }
+};
 
-  const [saving, setSaving] = useState(false);
-  const [status, setStatus] = useState(null); // { type: "success"|"error", msg: string }
+const domainFromUrl = (u="") => {
+  try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return u; }
+};
 
-  const handleFileChange = (e) => {
-    if (e.target.files && e.target.files[0]) setSelectedFile(e.target.files[0]);
-  };
+export default function Profile() {
+  const { handle } = useParams();
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(null);
+  const [data, setData] = useState(null);
 
-  const handleSave = async () => {
-    setSaving(true);
-    setStatus(null);
-    try {
-      // --- Local persistence (works out of the box) ---
-      const payload = { firstName, lastName };
-      localStorage.setItem("profile", JSON.stringify(payload));
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    setErr(null);
+    getPublicProfile(handle)
+      .then(({ data }) => { if (mounted) setData(data); })
+      .catch((e) => { if (mounted) setErr(e?.response?.data?.error || e.message); })
+      .finally(() => { if (mounted) setLoading(false); });
+    return () => { mounted = false; };
+  }, [handle]);
 
-      // --- Optional: wire to your backend (uncomment + adjust endpoints) ---
-      // const token = localStorage.getItem("token");
-      // const API = "http://localhost:4000"; // or your prod URL
+  const shareUrl = useMemo(() => `${siteBase()}/@${handle}`, [handle]);
 
-      // // 1) Upload avatar if a file is selected
-      // if (selectedFile) {
-      //   const fd = new FormData();
-      //   fd.append("avatar", selectedFile);
-      //   await fetch(`${API}/api/profile/avatar`, {
-      //     method: "POST",
-      //     headers: { Authorization: `Bearer ${token}` },
-      //     body: fd,
-      //   });
-      // }
+  if (loading) return <div className="p-6">Loading…</div>;
+  if (err)      return <div className="p-6 text-red-600">Error: {String(err)}</div>;
+  if (!data)    return <div className="p-6">No data</div>;
 
-      // // 2) Save profile fields
-      // await fetch(`${API}/api/profile`, {
-      //   method: "PATCH",
-      //   headers: {
-      //     "Content-Type": "application/json",
-      //     Authorization: `Bearer ${token}`,
-      //   },
-      //   body: JSON.stringify(payload),
-      // });
-
-      setStatus({ type: "success", msg: "Saved!" });
-    } catch (e) {
-      setStatus({ type: "error", msg: e?.message || "Failed to save" });
-    } finally {
-      setSaving(false);
-    }
-  };
+  const p = data.profile || {};
+  const links = Array.isArray(data.links) ? data.links : [];
 
   return (
-    <div className="bg-white p-5 rounded border">
-      <h1 className="text-xl font-bold mb-4">Profile</h1>
-
-      <div className="grid gap-5 md:grid-cols-2">
-        {/* Avatar uploader */}
-        <div>
-          <label className="block mb-2 text-sm text-gray-600">Profile Photo</label>
-          <input type="file" accept="image/*" onChange={handleFileChange} />
-          <div className="mt-3">
-            <div className="w-32 h-32 rounded-full overflow-hidden border bg-gray-100">
-              {image ? (
-                <img src={image} alt="Selected Profile" className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full grid place-items-center text-gray-400 text-xs">No photo</div>
-              )}
-            </div>
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-xl mx-auto p-6">
+        {/* Header / avatar */}
+        <div className="flex items-center gap-4">
+          <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-200 border">
+            {p.avatarUrl ? (
+              <img src={p.avatarUrl} alt={p.fullName || p.handle} className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full grid place-items-center text-gray-400 text-sm">No photo</div>
+            )}
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold">
+              {p.fullName || `@${p.handle}`}
+            </h1>
+            {p.fullName && <p className="text-gray-500">@{p.handle}</p>}
+            {p.bio && <p className="text-gray-600 mt-1">{p.bio}</p>}
           </div>
         </div>
 
-        {/* Name fields */}
-        <div className="grid gap-4">
-          <div>
-            <label className="block mb-1 text-sm text-gray-600">First Name</label>
-            <input
-              className="border p-2 w-full rounded"
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-              placeholder="John"
-            />
-          </div>
-          <div>
-            <label className="block mb-1 text-sm text-gray-600">Last Name</label>
-            <input
-              className="border p-2 w-full rounded"
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-              placeholder="Doe"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Save actions */}
-      <div className="mt-6 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saving}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
-        >
-          {saving ? "Saving..." : "Save"}
-        </button>
-        {status && (
-          <span
-            className={status.type === "success" ? "text-green-600 text-sm" : "text-red-600 text-sm"}
+        {/* Share link */}
+        <div className="mt-4 flex items-center gap-2">
+          <input
+            readOnly
+            value={shareUrl}
+            className="flex-1 border rounded p-2 text-sm bg-white"
+          />
+          <button
+            className="px-3 py-2 text-sm rounded bg-blue-600 text-white"
+            onClick={() => {
+              navigator.clipboard.writeText(shareUrl).catch(() => {});
+            }}
           >
-            {status.msg}
-          </span>
-        )}
+            Copy
+          </button>
+        </div>
+
+        {/* Links */}
+        <div className="mt-6 grid gap-3">
+          {links.length === 0 && (
+            <div className="text-gray-500">No links yet.</div>
+          )}
+          {links.map((l, i) => (
+            <a
+              key={`${l.url}-${i}`}
+              href={l.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full border bg-white rounded px-4 py-3 hover:shadow flex items-center gap-3"
+            >
+              <div className="w-6 h-6 rounded overflow-hidden bg-gray-100 border shrink-0 grid place-items-center text-xs">
+                {/* simple favicon-like block: domain initials */}
+                {domainFromUrl(l.url).split(".")[0].slice(0,2).toUpperCase()}
+              </div>
+              <div className="flex-1">
+                <div className="font-medium">{l.title || domainFromUrl(l.url)}</div>
+                <div className="text-xs text-gray-500 truncate">{domainFromUrl(l.url)}</div>
+              </div>
+              <span className="text-blue-600 text-sm">Open</span>
+            </a>
+          ))}
+        </div>
       </div>
     </div>
   );
-};
+}

@@ -16,22 +16,27 @@ export const Dashboard = () => {
     try {
       const raw = localStorage.getItem("links");
       return raw ? JSON.parse(raw) : [];
-    } catch { return []; }
+    } catch {
+      return [];
+    }
   });
 
   useEffect(() => {
-    localStorage.setItem("links", JSON.stringify(links));
+    try {
+      localStorage.setItem("links", JSON.stringify(links));
+    } catch {}
   }, [links]);
 
   const addLink = () => {
     const id = (crypto?.randomUUID && crypto.randomUUID()) || Date.now();
-    setLinks(prev => [...prev, { id, type: "", name: "", url: "" }]);
+    setLinks((prev) => [...prev, { id, type: "", name: "", url: "" }]);
   };
-  const removeLink = (id) => setLinks(prev => prev.filter(l => l.id !== id));
-  const updateLink = (id, patch) => setLinks(prev => prev.map(l => (l.id === id ? { ...l, ...patch } : l)));
+  const removeLink = (id) => setLinks((prev) => prev.filter((l) => l.id !== id));
+  const updateLink = (id, patch) =>
+    setLinks((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)));
 
   // ====== Profile state (lifted) ======
-  const [selectedFile, setSelectedFile] = useState(null);  // File object
+  const [selectedFile, setSelectedFile] = useState(null); // File object
   const image = useMemo(() => {
     if (!selectedFile) return "";
     return URL.createObjectURL(selectedFile);
@@ -39,16 +44,33 @@ export const Dashboard = () => {
 
   useEffect(() => {
     // revoke object URL when file changes/unmounts
-    return () => { if (image) URL.revokeObjectURL(image); };
+    return () => {
+      if (image) URL.revokeObjectURL(image);
+    };
   }, [image]);
 
   const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName]   = useState("");
+  const [lastName, setLastName] = useState("");
 
   const logout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("me");
     navigate("/login");
+  };
+
+  // Preview handler: go to public page if handle exists; else go to profile editor
+  const goPreview = () => {
+    try {
+      const cached = JSON.parse(localStorage.getItem("profile") || "{}");
+      const handle = cached?.handle && String(cached.handle).trim();
+      if (handle) {
+        navigate(`/@:${handle}`); // public shareable page
+      } else {
+        navigate("/@:handle"); // ask user to set a handle
+      }
+    } catch {
+      navigate("/@:handle");
+    }
   };
 
   const navLinkBase = "flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100";
@@ -66,13 +88,22 @@ export const Dashboard = () => {
           <li>
             <ul className="flex gap-4">
               <li>
-                <NavLink to="links" className={({ isActive }) => `${navLinkBase} ${isActive ? navLinkActive : ""}`} end>
-                  <FaLink /><span>Links</span>
+                <NavLink
+                  to="links"
+                  className={({ isActive }) => `${navLinkBase} ${isActive ? navLinkActive : ""}`}
+                  end
+                >
+                  <FaLink />
+                  <span>Links</span>
                 </NavLink>
               </li>
               <li>
-                <NavLink to="profile" className={({ isActive }) => `${navLinkBase} ${isActive ? navLinkActive : ""}`}>
-                  <FaRegUserCircle /><span>Profile Details</span>
+                <NavLink
+                  to="profile"
+                  className={({ isActive }) => `${navLinkBase} ${isActive ? navLinkActive : ""}`}
+                >
+                  <FaRegUserCircle />
+                  <span>Profile Details</span>
                 </NavLink>
               </li>
             </ul>
@@ -80,10 +111,18 @@ export const Dashboard = () => {
 
           <li>
             <ul className="flex gap-3 items-center">
-              <li className="p-2 rounded hover:bg-gray-100 cursor-pointer" title="Preview">
+              <li
+                className="p-2 rounded hover:bg-gray-100 cursor-pointer"
+                title="Preview"
+                onClick={goPreview}
+              >
                 <IoEyeOutline />
               </li>
-              <li className="p-2 rounded hover:bg-gray-100 cursor-pointer" title="Log out" onClick={logout}>
+              <li
+                className="p-2 rounded hover:bg-gray-100 cursor-pointer"
+                title="Log out"
+                onClick={logout}
+              >
                 <RxExit />
               </li>
             </ul>
@@ -99,28 +138,44 @@ export const Dashboard = () => {
               {image ? (
                 <img src={image} alt="Profile" className="w-full h-full object-cover" />
               ) : (
-                <div className="w-full h-full grid place-items-center text-gray-400 text-sm">No photo</div>
+                <div className="w-full h-full grid place-items-center text-gray-400 text-sm">
+                  No photo
+                </div>
               )}
             </div>
             <div className="text-center">
-              <div className="font-medium">{[firstName, lastName].filter(Boolean).join(" ") || "Your name"}</div>
+              <div className="font-medium">
+                {[firstName, lastName].filter(Boolean).join(" ") || "Your name"}
+              </div>
             </div>
           </div>
 
           <p className="text-sm text-gray-500 mb-3">Links</p>
           <div className="space-y-2">
-            {links.length === 0 && <div className="text-gray-400 text-sm">No links yet — add one!</div>}
-            {links.map(link => {
+            {links.length === 0 && (
+              <div className="text-gray-400 text-sm">No links yet — add one!</div>
+            )}
+            {links.map((link) => {
               const Icon = ICONS[link.type || "custom"] || TbDots;
               const label = link.name || (link.type ? link.type : "Untitled");
               return (
-                <div key={link.id} className="flex items-center justify-between border rounded px-3 py-2">
+                <div
+                  key={link.id}
+                  className="flex items-center justify-between border rounded px-3 py-2"
+                >
                   <span className="flex items-center gap-2">
                     <Icon />
                     <span className="truncate max-w-[200px]">{label}</span>
                   </span>
                   {link.url ? (
-                    <a href={link.url} target="_blank" rel="noreferrer" className="text-blue-600 text-sm">visit</a>
+                    <a
+                      href={link.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-blue-600 text-sm"
+                    >
+                      visit
+                    </a>
                   ) : (
                     <span className="text-gray-400 text-xs">no url</span>
                   )}
@@ -135,11 +190,19 @@ export const Dashboard = () => {
           <Outlet
             context={{
               // links management
-              links, addLink, removeLink, updateLink, setLinks,
+              links,
+              addLink,
+              removeLink,
+              updateLink,
+              setLinks,
               // profile management
-              image, selectedFile, setSelectedFile,
-              firstName, setFirstName,
-              lastName, setLastName,
+              image,
+              selectedFile,
+              setSelectedFile,
+              firstName,
+              setFirstName,
+              lastName,
+              setLastName,
             }}
           />
         </section>

@@ -22,6 +22,25 @@ const URL_PLACEHOLDER = {
   custom:  "https://your-link",
 };
 
+const labelForType = (type) =>
+  (OPTIONS.find((o) => o.value === type)?.label) || "Link";
+
+const ensureHttpUrl = (s = "") => {
+  const t = String(s).trim();
+  if (!t) return "";
+  return /^https?:\/\//i.test(t) ? t : `https://${t}`;
+};
+
+
+const toBulkPayload = (links = []) =>
+  links
+    .filter((l) => String(l?.url || "").trim()) // keep only rows with a URL
+    .map((l, idx) => ({
+      title: (l?.name || "").trim() || labelForType(l?.type) || `Link ${idx + 1}`,
+      url: ensureHttpUrl(l?.url || ""),
+      isActive: l?.isActive !== false,
+    }));
+
 export const Links = () => {
   // Expected context shape: { links, addLink, removeLink, updateLink, replaceLinks? }
   const { links, addLink, removeLink, updateLink, replaceLinks } = useOutletContext();
@@ -29,39 +48,49 @@ export const Links = () => {
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState(null); // { type: 'success'|'error', msg: string }
 
-  const handleSave = async () => {
-    setSaving(true);
-    setStatus(null);
+  // Links.jsx
+const handleSave = async () => {
+  setSaving(true);
+  setStatus(null);
+  try {
+    localStorage.setItem("links", JSON.stringify(links));
+
+    const token = localStorage.getItem("token");
+    const payload = toBulkPayload(links);          // <-- HERE
+    await saveMyLinksBulk(payload, token);         // send normalized array
+
+    // Optional: refetch, but mind the response shape
     try {
-      // Persist locally as a fallback
-      localStorage.setItem("links", JSON.stringify(links));
-
-      // Save on server (uses axios instance with Authorization header)
-      const token = localStorage.getItem("token");
-      await saveMyLinksBulk(links, token);
-
-      // Optional: refetch latest sorted/sanitized links from server
-      try {
-        const { data } = await listMyLinks(token);
-        if (replaceLinks && Array.isArray(data?.links)) {
-          replaceLinks(data.links);
-        }
-      } catch {
-        // ignore refetch errors; the primary PUT already succeeded
+      const { data } = await listMyLinks(token);
+      if (replaceLinks && Array.isArray(data?.data)) {
+        replaceLinks(
+          data.data.map((doc) => ({
+            id: doc._id,
+            _id: doc._id,
+            type: "custom",          // or infer from URL if you want
+            name: doc.title,
+            url: doc.url,
+            isActive: doc.isActive,
+            order: doc.order,
+          }))
+        );
       }
+    } catch {}
 
-      setStatus({ type: "success", msg: "Links saved!" });
-    } catch (e) {
-      const msg =
-        e?.response?.data?.error ||
-        e?.response?.data?.message ||
-        e?.message ||
-        "Failed to save";
-      setStatus({ type: "error", msg });
-    } finally {
-      setSaving(false);
-    }
-  };
+    setStatus({ type: "success", msg: "Links saved!" });
+  } catch (e) {
+    const msg =
+      e?.response?.data?.error ||
+      e?.response?.data?.message ||
+      e?.message ||
+      "Failed to save";
+    setStatus({ type: "error", msg });
+  } finally {
+    setSaving(false);
+  }
+};
+
+
 
   return (
     <div className="bg-white p-5 rounded border">
