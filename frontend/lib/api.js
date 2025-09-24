@@ -41,8 +41,10 @@ export const api = axios.create({
     Accept: "application/json",
   },
   // If you switch to cookie sessions, uncomment:
-   withCredentials: true,
+   //withCredentials: true,
 });
+
+
 
 /* -------- Token helpers -------- */
 export const setAuthToken = (token) => {
