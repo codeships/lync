@@ -1,3 +1,4 @@
+// src/pages/Dashboard.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import Logo from "../assets/logo.png";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
@@ -5,7 +6,9 @@ import { FaLink, FaRegUserCircle, FaGlobe, FaTwitter, FaLinkedin, FaYoutube } fr
 import { IoEyeOutline } from "react-icons/io5";
 import { RxExit } from "react-icons/rx";
 import { TbDots } from "react-icons/tb";
-import { logout as apiLogout } from "../../lib/api"; // <-- Import your API logout
+
+// IMPORTANT: include .js to be safe on Linux (Vercel)
+import { logout as apiLogout, getMyProfile } from "../../lib/api.js";
 
 const ICONS = {
   website: FaGlobe,
@@ -56,7 +59,22 @@ export const Dashboard = () => {
   }, [image]);
 
   const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
+  const [lastName, setLastName]   = useState("");
+  const [handle, setHandle]       = useState("");   // <-- added
+
+  // Hydrate basic profile info for the left preview + preview URL
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await getMyProfile();
+        if (data?.firstName) setFirstName(data.firstName);
+        if (data?.lastName)  setLastName(data.lastName);
+        if (data?.handle)    setHandle(data.handle);
+      } catch {
+        // ignore; user may not be logged in yet
+      }
+    })();
+  }, []);
 
   /** ===============================
    * Logout Handler
@@ -64,7 +82,7 @@ export const Dashboard = () => {
    */
   const handleLogout = async () => {
     try {
-      await apiLogout(); // Clears token & local storage
+      await apiLogout(); // Clears token & local storage (via helper)
       navigate("/login"); // Redirect to login
     } catch (err) {
       console.error("Logout error:", err);
@@ -73,17 +91,17 @@ export const Dashboard = () => {
   };
 
   // Preview handler: go to public page if handle exists; else go to profile editor
-  const goPreview = () => {
+  const goPreview = async () => {
     try {
-      const cached = JSON.parse(localStorage.getItem("profile") || "{}");
-      const handle = cached?.handle && String(cached.handle).trim();
-      if (handle) {
-        navigate(`/@:${handle}`); // public shareable page
+      const { data } = await getMyProfile();            // trust backend
+      const h = (data?.handle || "").trim().toLowerCase();
+      if (h) {
+        navigate(`/@${encodeURIComponent(h)}`);         // ✅ no colon in URL
       } else {
-        navigate("/@:handle"); // ask user to set a handle
+        navigate("/dashboard/profile");                 // ask user to set a handle
       }
     } catch {
-      navigate("/@:handle");
+      navigate("/login");
     }
   };
 
@@ -129,7 +147,7 @@ export const Dashboard = () => {
             <ul className="flex gap-3 items-center">
               <li
                 className="p-2 rounded hover:bg-gray-100 cursor-pointer"
-                title="Preview"
+                title={handle ? `Preview /@${handle}` : "Preview (set a handle first)"}
                 onClick={goPreview}
               >
                 <IoEyeOutline />
@@ -137,7 +155,7 @@ export const Dashboard = () => {
               <li
                 className="p-2 rounded hover:bg-gray-100 cursor-pointer text-red-600"
                 title="Log out"
-                onClick={handleLogout} // <--- Calls the logout handler
+                onClick={handleLogout}
               >
                 <RxExit />
               </li>
@@ -164,6 +182,11 @@ export const Dashboard = () => {
               <div className="font-medium">
                 {[firstName, lastName].filter(Boolean).join(" ") || "Your name"}
               </div>
+              {handle ? (
+                <div className="text-xs text-gray-500 mt-1">/@{handle}</div>
+              ) : (
+                <div className="text-xs text-gray-400 mt-1">set your handle to share</div>
+              )}
             </div>
           </div>
 
@@ -175,9 +198,10 @@ export const Dashboard = () => {
             {links.map((link) => {
               const Icon = ICONS[link.type || "custom"] || TbDots;
               const label = link.name || (link.type ? link.type : "Untitled");
+              const key = link.id || link._id;
               return (
                 <div
-                  key={link.id}
+                  key={key}
                   className="flex items-center justify-between border rounded px-3 py-2"
                 >
                   <span className="flex items-center gap-2">
@@ -220,6 +244,8 @@ export const Dashboard = () => {
               setFirstName,
               lastName,
               setLastName,
+              handle,            // <-- expose to children
+              setHandle,         // <--
             }}
           />
         </section>
@@ -227,3 +253,5 @@ export const Dashboard = () => {
     </div>
   );
 };
+
+export default Dashboard;
