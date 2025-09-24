@@ -9,6 +9,7 @@ const router = Router();
 router.get("/:handle", async (req, res, next) => {
   try {
     const handle = String(req.params.handle || "").trim().toLowerCase();
+    console.log("[public] GET /api/public/%s", handle);
     if (!handle) return res.status(400).json({ error: "handle_required" });
 
     const user = await User.findOne({ handle }).lean();

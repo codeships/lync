@@ -12,13 +12,15 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/@:handle" element={<Preview />} />
+
+
         {/* Public routes */}
         <Route path="/" element={<Home />} />
         <Route path="/signup" element={<SignUp />} />
         <Route path="/login" element={<LogIn />} />
 
         {/* Public shareable profile: https://site.com/@yourhandle */}
-        <Route path="/@:handle" element={<Preview />} />
 
         {/* Private dashboard */}
         <Route path="/dashboard" element={<Dashboard />}>

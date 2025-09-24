@@ -178,3 +178,73 @@ export const logout = () => {
   storage.remove("me");
   return Promise.resolve();
 };
+
+/* -------- Public profile helpers (cached + robust) -------- */
+
+// Normalize any incoming route param to a safe handle
+export const normalizeHandle = (raw) => {
+  if (!raw) return "";
+  return String(raw).replace(/^[@:]+/, "").trim().toLowerCase();
+};
+
+// Resolve an asset (e.g., avatarUrl) against API_BASE (or window origin if relative base)
+export const resolveAssetUrl = (u, base = API_BASE) => {
+  if (!u) return "";
+  try {
+    if (/^https?:\/\//i.test(u)) return u;
+    const b = String(base || "");
+    const absolute = /^https?:\/\//i.test(b)
+      ? b
+      : (typeof window !== "undefined" && window.location?.origin) || "http://localhost:5173";
+    return new URL(u, absolute.endsWith("/") ? absolute : absolute + "/").toString();
+  } catch {
+    return u;
+  }
+};
+
+// Simple in-memory + sessionStorage cache (SWR-ish)
+const _ppMem = new Map(); // handle -> { data, ts }
+const _ppKey = (h) => `pprofile:${h}`;
+
+export async function getPublicProfileCached(handle, { ttl = 30000, signal } = {}) {
+  const h = normalizeHandle(handle);
+  if (!h) {
+    const err = new Error("invalid_handle");
+    err.code = "invalid_handle";
+    throw err;
+  }
+
+  const now = Date.now();
+
+  // 1) Memory cache
+  const mem = _ppMem.get(h);
+  if (mem && now - mem.ts < ttl) return mem.data;
+
+  // 2) Session cache
+  try {
+    const raw = sessionStorage.getItem(_ppKey(h));
+    if (raw) {
+      const cached = JSON.parse(raw);
+      if (cached?.ts && now - cached.ts < ttl) {
+        _ppMem.set(h, { data: cached.data, ts: cached.ts });
+        return cached.data;
+      }
+    }
+  } catch {}
+
+  // 3) Network
+  try {
+    const res = await api.get(`/api/public/${encodeURIComponent(h)}`, { signal });
+    const data = res.data;
+    const pack = { data, ts: now };
+    _ppMem.set(h, pack);
+    try { sessionStorage.setItem(_ppKey(h), JSON.stringify(pack)); } catch {}
+    return data;
+  } catch (e) {
+    const msg = e?.response?.data?.error || e.message || "error";
+    const err = new Error(msg);
+    err.code = msg;
+    throw err;
+  }
+}
+
