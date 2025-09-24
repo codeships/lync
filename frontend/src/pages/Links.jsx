@@ -1,10 +1,11 @@
-// Links.jsx / Links.tsx
+// src/pages/dashboard/Links.jsx
 import React, { useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { MdDelete } from "react-icons/md";
 import { FaGlobe, FaTwitter, FaLinkedin, FaYoutube } from "react-icons/fa";
 import { TbDots } from "react-icons/tb";
-import { listMyLinks, saveMyLinksBulk } from "../../lib/api";
+// IMPORTANT: include .js to avoid case/extension issues on Linux (Vercel)
+import { listMyLinks, saveMyLinks } from "../../lib/api.js";
 
 const OPTIONS = [
   { value: "website",  label: "Website",  Icon: FaGlobe },
@@ -31,7 +32,7 @@ const ensureHttpUrl = (s = "") => {
   return /^https?:\/\//i.test(t) ? t : `https://${t}`;
 };
 
-
+// Normalize local rows → server payload
 const toBulkPayload = (links = []) =>
   links
     .filter((l) => String(l?.url || "").trim()) // keep only rows with a URL
@@ -42,55 +43,71 @@ const toBulkPayload = (links = []) =>
     }));
 
 export const Links = () => {
-  // Expected context shape: { links, addLink, removeLink, updateLink, replaceLinks? }
-  const { links, addLink, removeLink, updateLink, replaceLinks } = useOutletContext();
+  // Expected outlet context: { links, addLink, removeLink, updateLink, setLinks?, replaceLinks? }
+  const outlet = useOutletContext() || {};
+  const {
+    links = [],
+    addLink = () => {},
+    removeLink = () => {},
+    updateLink = () => {},
+    // Prefer replaceLinks if parent provided, else fall back to overwriting setLinks
+    replaceLinks,
+    setLinks,
+  } = outlet;
 
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState(null); // { type: 'success'|'error', msg: string }
 
-  // Links.jsx
-const handleSave = async () => {
-  setSaving(true);
-  setStatus(null);
-  try {
-    localStorage.setItem("links", JSON.stringify(links));
-
-    const token = localStorage.getItem("token");
-    const payload = toBulkPayload(links);          // <-- HERE
-    await saveMyLinksBulk(payload, token);         // send normalized array
-
-    // Optional: refetch, but mind the response shape
+  const handleSave = async () => {
+    setSaving(true);
+    setStatus(null);
     try {
-      const { data } = await listMyLinks(token);
-      if (replaceLinks && Array.isArray(data?.data)) {
-        replaceLinks(
-          data.data.map((doc) => ({
-            id: doc._id,
-            _id: doc._id,
-            type: "custom",          // or infer from URL if you want
-            name: doc.title,
-            url: doc.url,
-            isActive: doc.isActive,
-            order: doc.order,
-          }))
-        );
+      // Keep local draft
+      localStorage.setItem("links", JSON.stringify(links));
+
+      // Build normalized payload array
+      const payload = toBulkPayload(links);
+
+      // Save to server (PUT /api/links/me/bulk)
+      // saveMyLinks() expects (linksArray, token?) and wraps { links } body.
+      const token = localStorage.getItem("token"); // optional; interceptor also adds it if stored
+      await saveMyLinks(payload, token);
+
+      // Optionally refresh from server (GET /api/links/me) to reflect canonical order/_ids
+      try {
+        const { data: resp } = await listMyLinks(token);
+        const items = resp?.data || [];
+        const mapped = items.map((doc) => ({
+          id: doc._id,
+          _id: doc._id,
+          type: "custom", // or infer from URL if desired
+          name: doc.title,
+          url: doc.url,
+          isActive: doc.isActive,
+          order: doc.order,
+        }));
+
+        if (typeof replaceLinks === "function") {
+          replaceLinks(mapped);
+        } else if (typeof setLinks === "function") {
+          setLinks(mapped);
+        }
+      } catch {
+        // ignore refetch errors; save succeeded
       }
-    } catch {}
 
-    setStatus({ type: "success", msg: "Links saved!" });
-  } catch (e) {
-    const msg =
-      e?.response?.data?.error ||
-      e?.response?.data?.message ||
-      e?.message ||
-      "Failed to save";
-    setStatus({ type: "error", msg });
-  } finally {
-    setSaving(false);
-  }
-};
-
-
+      setStatus({ type: "success", msg: "Links saved!" });
+    } catch (e) {
+      const msg =
+        e?.response?.data?.error ||
+        e?.response?.data?.message ||
+        e?.message ||
+        "Failed to save";
+      setStatus({ type: "error", msg });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="bg-white p-5 rounded border">
@@ -218,3 +235,5 @@ const handleSave = async () => {
     </div>
   );
 };
+
+export default Links;

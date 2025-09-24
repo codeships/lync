@@ -49,7 +49,7 @@ export const api = axios.create({
     Accept: "application/json",
   },
   // You use Bearer tokens (no cookies) -> keep credentials off to simplify CORS
-  withCredentials: true,
+  withCredentials: false,
 });
 
 // simple exponential backoff helper
@@ -154,7 +154,7 @@ export const listMyLinks = (token, { limit = 50, skip = 0, q = "" } = {}) =>
     params: { limit, skip, q },
   });
 
-export const saveMyLinksBulk = (links, token) =>
+export const saveMyLinks = (links, token) =>
   api.put("/api/links/me/bulk", { links }, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
