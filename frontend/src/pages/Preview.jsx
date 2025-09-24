@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getPublicProfile, API_BASE } from "../../lib/api.js";
 
-export default function PublicProfile() {
+export default function Preview() {
   const { handle: raw } = useParams();          // route pattern should be "/@:handle"
   const navigate = useNavigate();
 
