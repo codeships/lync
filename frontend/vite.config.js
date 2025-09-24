@@ -18,11 +18,17 @@ export default defineConfig(({ mode }) => ({
 
       // Optional: local auth server (only if you run one on :4000)
       "/auth": {
-        target: "http://localhost:4000",
+        target: "https://lync-backend-gghg.onrender.com",
         changeOrigin: true,
-        secure: false,
+        secure: true,
         // If your local server does NOT have the /auth prefix, uncomment:
         // rewrite: (path) => path.replace(/^\/auth/, ""),
+      },
+
+      "/uploads": {
+        target: "https://lync-backend-gghg.onrender.com",
+        changeOrigin: true,
+        secure: true,
       },
     },
   },

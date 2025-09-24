@@ -51,7 +51,27 @@ app.use(cookieParser());
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: false })); // explicit to avoid deprecation
 app.use(morgan('dev'));
-app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+
+app.use("/uploads", (req, res, next) => {
+  // Either add CORP that allows cross-origin...
+  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+  // ...or allow via CORS (also fine for <img> loads)
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  next();
+});
+
+app.use(
+  "/uploads",
+  express.static(path.join(process.cwd(), "uploads"), {
+    // Optional: set headers here instead
+    setHeaders(res /*, path, stat */) {
+      res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      // You can also add cache headers:
+      // res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    },
+  })
+);
 
 /* ------------------- Health / Debug --------------------- */
 app.get('/health', (_req, res) => res.json({ ok: true, env: NODE_ENV }));

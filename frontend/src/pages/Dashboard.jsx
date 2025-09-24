@@ -5,8 +5,15 @@ import { FaLink, FaRegUserCircle, FaGlobe, FaTwitter, FaLinkedin, FaYoutube } fr
 import { IoEyeOutline } from "react-icons/io5";
 import { RxExit } from "react-icons/rx";
 import { TbDots } from "react-icons/tb";
+import { logout as apiLogout } from "../../lib/api"; // <-- Import your API logout
 
-const ICONS = { website: FaGlobe, twitter: FaTwitter, linkedin: FaLinkedin, youtube: FaYoutube, custom: TbDots };
+const ICONS = {
+  website: FaGlobe,
+  twitter: FaTwitter,
+  linkedin: FaLinkedin,
+  youtube: FaYoutube,
+  custom: TbDots,
+};
 
 export const Dashboard = () => {
   const navigate = useNavigate();
@@ -43,7 +50,6 @@ export const Dashboard = () => {
   }, [selectedFile]);
 
   useEffect(() => {
-    // revoke object URL when file changes/unmounts
     return () => {
       if (image) URL.revokeObjectURL(image);
     };
@@ -52,10 +58,18 @@ export const Dashboard = () => {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
 
-  const logout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("me");
-    navigate("/login");
+  /** ===============================
+   * Logout Handler
+   * ===============================
+   */
+  const handleLogout = async () => {
+    try {
+      await apiLogout(); // Clears token & local storage
+      navigate("/login"); // Redirect to login
+    } catch (err) {
+      console.error("Logout error:", err);
+      navigate("/login");
+    }
   };
 
   // Preview handler: go to public page if handle exists; else go to profile editor
@@ -78,6 +92,7 @@ export const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Navigation Bar */}
       <nav className="bg-white border-b">
         <ul className="max-w-6xl mx-auto flex justify-between items-center p-5">
           <li className="flex items-center gap-3">
@@ -109,6 +124,7 @@ export const Dashboard = () => {
             </ul>
           </li>
 
+          {/* Right icons */}
           <li>
             <ul className="flex gap-3 items-center">
               <li
@@ -119,9 +135,9 @@ export const Dashboard = () => {
                 <IoEyeOutline />
               </li>
               <li
-                className="p-2 rounded hover:bg-gray-100 cursor-pointer"
+                className="p-2 rounded hover:bg-gray-100 cursor-pointer text-red-600"
                 title="Log out"
-                onClick={logout}
+                onClick={handleLogout} // <--- Calls the logout handler
               >
                 <RxExit />
               </li>
@@ -130,6 +146,7 @@ export const Dashboard = () => {
         </ul>
       </nav>
 
+      {/* Main Content */}
       <main className="max-w-6xl mx-auto flex gap-8 p-5">
         {/* LEFT: Live Preview */}
         <aside className="hidden md:block border bg-white rounded w-[320px] min-h-[60vh] p-4">
