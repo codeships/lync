@@ -49,7 +49,7 @@ export const api = axios.create({
     Accept: "application/json",
   },
   // You use Bearer tokens (no cookies) -> keep credentials off to simplify CORS
-  withCredentials: false,
+  withCredentials: true,
 });
 
 // simple exponential backoff helper
