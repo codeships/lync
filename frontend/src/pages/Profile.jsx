@@ -37,7 +37,7 @@ export const Profile = () => {
       // 2) Save profile fields
       await withRetry(() => updateMyProfile(payload), { retries: 2, baseDelay: 700 });
 
-      setStatus({ type: "success", msg: "Saved to database!" });
+      setStatus({ type: "success", msg: "Saved!" });
     } catch (e) {
       const msg =
         e?.response?.data?.error ||
