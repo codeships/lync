@@ -7,9 +7,15 @@ const fromVite =
   import.meta?.env &&
   import.meta.env.VITE_API_URL;
 
-// Works with absolute URLs (https://api...) or "/" when using Vercel rewrites.
-// Falls back to localhost for dev.
-export const API_BASE = (fromVite && String(fromVite)) || "http://localhost:4000";
+// Allow absolute (https://api...) or relative ("/") bases (for Vercel rewrites)
+const normalizeBase = (b) => {
+  if (!b) return "http://localhost:4000";
+  const s = String(b).trim();
+  // strip trailing slash
+  return s.endsWith("/") && s !== "/" ? s.slice(0, -1) : s;
+};
+
+export const API_BASE = normalizeBase(fromVite || "http://localhost:4000");
 
 /* -------- Token storage helpers (SSR-safe) -------- */
 const canUseStorage = typeof window !== "undefined" && !!window.localStorage;
@@ -36,18 +42,17 @@ const TOKEN_KEY = "token";
 
 /* -------- Single Axios instance -------- */
 export const api = axios.create({
-  baseURL: API_BASE,         // can be "/" if you proxy via Vercel rewrites
-  timeout: 30000,            // bump to 30s to survive cold starts
+  baseURL: API_BASE,              // can be "https://api..." or "/"
+  timeout: 30000,                 // bump to 30s for cold starts
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",
   },
-  // If you switch to cookie sessions, set this to true
-  // AND enable credentials in your server CORS config.
+  // You use Bearer tokens (no cookies) -> keep credentials off to simplify CORS
   withCredentials: false,
 });
 
-/* -------- Small retry helper -------- */
+// simple exponential backoff helper
 export async function withRetry(fn, { retries = 2, baseDelay = 600 } = {}) {
   let lastErr;
   for (let i = 0; i <= retries; i++) {
@@ -93,6 +98,9 @@ api.interceptors.response.use(
 // Health
 export const pingHealth = () => api.get("/api/health");
 
+/** Optional: call once on app start to warm the API (no React hooks here) */
+export const warmApi = () => pingHealth().catch(() => {});
+
 // Profile (private)
 export const updateMyProfile = (payload) =>
   api.patch("/api/profile/me", payload);
@@ -115,7 +123,7 @@ export const toggleLink = (id, isActive) =>
 export const reorderLinks = (items) =>
   api.post(`/api/links/me/reorder`, { items });
 
-// Optional helpers used by your UI
+// (Optional) helpers to normalize user-entered URLs when bulk-saving
 const OPTION_LABEL = {
   website: "Website",
   twitter: "Twitter",
@@ -131,7 +139,7 @@ const ensureHttpUrl = (s = "") => {
   return `https://${t}`;
 };
 
-export const toBulkPayload = (links = []) =>
+const toBulkPayload = (links = []) =>
   links
     .filter(l => (l.url || "").trim())
     .map((l, idx) => ({
@@ -146,7 +154,7 @@ export const listMyLinks = (token, { limit = 50, skip = 0, q = "" } = {}) =>
     params: { limit, skip, q },
   });
 
-export const saveMyLinks = (links, token) =>
+export const saveMyLinksBulk = (links, token) =>
   api.put("/api/links/me/bulk", { links }, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
