@@ -1,5 +1,6 @@
 // lib/api.js
 import axios from "axios";
+import { useEffect } from "react";
 
 /* -------- Base URL -------- */
 const fromVite =
