@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getMyProfile, API_BASE } from "../../lib/api.js";
+import { getMyProfile, API_BASE, withRetry } from "../../lib/api.js";
 
 export default function Profile() {
   const [profile, setProfile] = useState(null);
@@ -12,18 +12,18 @@ export default function Profile() {
 
   // Fetch profile data on mount
   useEffect(() => {
-    (async () => {
-      try {
-        setLoading(true);
-        const res = await getMyProfile();
-        setProfile(res.data);
-      } catch (e) {
-        setError(e?.response?.data?.error || e.message);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+  (async () => {
+    try {
+      setLoading(true);
+      const res = await withRetry(() => getMyProfile(), { retries: 2, baseDelay: 800 });
+      setProfile(res.data);
+    } catch (e) {
+      setError(e?.response?.data?.error || e.message);
+    } finally {
+      setLoading(false);
+    }
+  })();
+}, []);
 
   // Build full avatar URL
   const avatarSrc = useMemo(() => {

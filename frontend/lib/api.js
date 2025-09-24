@@ -41,9 +41,18 @@ export const api = axios.create({
     Accept: "application/json",
   },
   // If you switch to cookie sessions, uncomment:
-   //withCredentials: true,
+   withCredentials: true,
 });
 
+// simple exponential backoff helper
+export async function withRetry(fn, { retries = 2, baseDelay = 600 } = {}) {
+  let lastErr;
+  for (let i = 0; i <= retries; i++) {
+    try { return await fn(); } catch (e) { lastErr = e; }
+    await new Promise(r => setTimeout(r, baseDelay * Math.pow(2, i)));
+  }
+  throw lastErr;
+}
 
 
 /* -------- Token helpers -------- */
@@ -175,4 +184,9 @@ export const logout = () => {
   storage.remove("me");
   return Promise.resolve();
 };
+
+// somewhere high in your app (e.g., App.jsx)
+useEffect(() => {
+  pingHealth().catch(() => {});
+}, []);
 
