@@ -2,7 +2,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Home from "./pages/Home";
 import { SignUp } from "./pages/auth/SignUp";
-import { LogIn } from "./pages/auth/Login";
+import { LogIn } from "./pages/auth/LogIn";
 import { Dashboard } from "./pages/Dashboard";   // keep as named if your file exports named
 import Profile from "./pages/Profile";           // <-- default import (fixes your error)
 import { Links } from "./pages/Links";
