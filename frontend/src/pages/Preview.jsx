@@ -1,7 +1,7 @@
 // src/pages/PublicProfile.jsx
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { getPublicProfile } from "../lib/api.js";
+import { getPublicProfile } from "../../lib/api.js";
 
 export default function Preview() {
   const { handle } = useParams(); // route path should be "/@:handle"
