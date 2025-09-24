@@ -1,105 +1,85 @@
-import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
-import { getPublicProfile } from "../../lib/api.js"; // adjust path
-
-const siteBase = () => {
-  try { return window.location.origin; } catch { return ""; }
-};
-
-const domainFromUrl = (u="") => {
-  try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return u; }
-};
+import { useEffect, useState, useMemo } from "react";
+import { getMyProfile, API_BASE } from "../../lib/api.js";
 
 export default function Profile() {
-  const { handle } = useParams();
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState(null);
-  const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    let mounted = true;
-    setLoading(true);
-    setErr(null);
-    getPublicProfile(handle)
-      .then(({ data }) => { if (mounted) setData(data); })
-      .catch((e) => { if (mounted) setErr(e?.response?.data?.error || e.message); })
-      .finally(() => { if (mounted) setLoading(false); });
-    return () => { mounted = false; };
-  }, [handle]);
+    (async () => {
+      try {
+        setLoading(true);
+        const res = await getMyProfile();
+        setProfile(res.data);
+      } catch (e) {
+        setError(e?.response?.data?.error || e.message);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
-  const shareUrl = useMemo(() => `${siteBase()}/@${handle}`, [handle]);
+  const avatarSrc = useMemo(() => {
+    const u = profile?.avatarUrl?.trim();
+    if (!u) return "";
+    // If it already looks absolute, use it as-is
+    if (/^https?:\/\//i.test(u)) return u;
+    // Otherwise prefix with API base (which already includes protocol)
+    const base = String(API_BASE).replace(/\/+$/,"");
+    const path = u.startsWith("/") ? u : `/${u}`;
+    return `${base}${path}`;
+  }, [profile?.avatarUrl]);
 
-  if (loading) return <div className="p-6">Loading…</div>;
-  if (err)      return <div className="p-6 text-red-600">Error: {String(err)}</div>;
-  if (!data)    return <div className="p-6">No data</div>;
+  const [imgOk, setImgOk] = useState(true);
 
-  const p = data.profile || {};
-  const links = Array.isArray(data.links) ? data.links : [];
+  if (loading) return <div className="p-6">Loading profile...</div>;
+  if (error)   return <div className="p-6 text-red-600">Error: {error}</div>;
+  if (!profile) return <div className="p-6">No profile data available.</div>;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-xl mx-auto p-6">
-        {/* Header / avatar */}
-        <div className="flex items-center gap-4">
-          <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-200 border">
-            {p.avatarUrl ? (
-              <img src={p.avatarUrl} alt={p.fullName || p.handle} className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full grid place-items-center text-gray-400 text-sm">No photo</div>
-            )}
-          </div>
-          <div>
-            <h1 className="text-2xl font-semibold">
-              {p.fullName || `@${p.handle}`}
-            </h1>
-            {p.fullName && <p className="text-gray-500">@{p.handle}</p>}
-            {p.bio && <p className="text-gray-600 mt-1">{p.bio}</p>}
-          </div>
-        </div>
-
-        {/* Share link */}
-        <div className="mt-4 flex items-center gap-2">
-          <input
-            readOnly
-            value={shareUrl}
-            className="flex-1 border rounded p-2 text-sm bg-white"
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="flex items-center space-x-4 mb-6">
+        {avatarSrc && imgOk ? (
+          <img
+            src={avatarSrc}
+            alt={`${profile.firstName} ${profile.lastName}`}
+            className="w-20 h-20 rounded-full object-cover border"
+            referrerPolicy="no-referrer"
+            onError={() => setImgOk(false)}
           />
-          <button
-            className="px-3 py-2 text-sm rounded bg-blue-600 text-white"
-            onClick={() => {
-              navigator.clipboard.writeText(shareUrl).catch(() => {});
-            }}
-          >
-            Copy
-          </button>
-        </div>
+        ) : (
+          <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">
+            No Image
+          </div>
+        )}
 
-        {/* Links */}
-        <div className="mt-6 grid gap-3">
-          {links.length === 0 && (
-            <div className="text-gray-500">No links yet.</div>
-          )}
-          {links.map((l, i) => (
-            <a
-              key={`${l.url}-${i}`}
-              href={l.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full border bg-white rounded px-4 py-3 hover:shadow flex items-center gap-3"
-            >
-              <div className="w-6 h-6 rounded overflow-hidden bg-gray-100 border shrink-0 grid place-items-center text-xs">
-                {/* simple favicon-like block: domain initials */}
-                {domainFromUrl(l.url).split(".")[0].slice(0,2).toUpperCase()}
-              </div>
-              <div className="flex-1">
-                <div className="font-medium">{l.title || domainFromUrl(l.url)}</div>
-                <div className="text-xs text-gray-500 truncate">{domainFromUrl(l.url)}</div>
-              </div>
-              <span className="text-blue-600 text-sm">Open</span>
-            </a>
-          ))}
+        <div>
+          <h1 className="text-2xl font-bold">
+            {profile.firstName} {profile.lastName}
+          </h1>
+          <p className="text-gray-600">{profile.email}</p>
+          <p className="text-gray-500">{profile.bio || "No bio provided"}</p>
         </div>
       </div>
+
+      <h2 className="text-xl font-semibold mb-2">Links</h2>
+      {profile.links?.length ? (
+        <ul className="space-y-2">
+          {profile.links.map((link) => (
+            <li key={link._id} className="bg-white p-3 rounded shadow flex justify-between items-center">
+              <a href={link.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                {link.title}
+              </a>
+              <span className={`text-xs px-2 py-1 rounded ${link.isActive ? "bg-green-100 text-green-600" : "bg-gray-200 text-gray-600"}`}>
+                {link.isActive ? "Active" : "Inactive"}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-gray-500">No links found.</p>
+      )}
     </div>
   );
 }

@@ -7,7 +7,7 @@ const fromVite =
   import.meta?.env &&
   import.meta.env.VITE_API_URL;
 
-const API_BASE = (fromVite && String(fromVite)) || "http://localhost:4000";
+export const API_BASE = (fromVite && String(fromVite)) || "http://localhost:4000";
 
 /* -------- Token storage helpers (SSR-safe) -------- */
 const canUseStorage = typeof window !== "undefined" && !!window.localStorage;
@@ -41,7 +41,7 @@ export const api = axios.create({
     Accept: "application/json",
   },
   // If you switch to cookie sessions, uncomment:
-  // withCredentials: true,
+   withCredentials: true,
 });
 
 /* -------- Token helpers -------- */

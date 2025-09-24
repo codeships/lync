@@ -2,12 +2,37 @@
 import { Router } from "express";
 import mongoose from "mongoose";
 import User from "../models/User.js";
+import Link from "../models/Link.js";              // <-- add
 import { authsRequired } from "../middleware/auth.js";
 
 const router = Router();
 const isOid = (v) => mongoose.Types.ObjectId.isValid(String(v || ""));
 
 router.use(authsRequired);
+
+/** helper: shape + include links */
+const profileWithLinks = async (userDoc) => {
+  const userId = String(userDoc._id);
+
+  const links = await Link.find({ user: userId })
+    .sort({ order: 1, createdAt: 1 })
+    .select({ _id: 1, title: 1, url: 1, isActive: 1, order: 1, createdAt: 1, updatedAt: 1 })
+    .lean();
+
+  return {
+    id: userId,
+    email: userDoc.email,
+    firstName: userDoc.firstName || "",
+    lastName: userDoc.lastName || "",
+    avatarUrl: userDoc.avatarUrl || "",
+    handle: userDoc.handle || "",
+    bio: userDoc.bio || "",
+    links,                           // <-- include links
+    meta: {
+      linksCount: links.length,      // optional convenience
+    },
+  };
+};
 
 /** GET /api/profile/me */
 router.get("/me", async (req, res, next) => {
@@ -18,18 +43,12 @@ router.get("/me", async (req, res, next) => {
     const user = await User.findOneAndUpdate(
       q,
       { $setOnInsert: setOnInsert },
-      { new: true, upsert: true }          // <-- auto-provision
+      { new: true, upsert: true }
     ).lean();
 
-    res.json({
-      id: String(user._id),
-      email: user.email,
-      firstName: user.firstName || "",
-      lastName: user.lastName || "",
-      avatarUrl: user.avatarUrl || "",
-      handle: user.handle || "",
-      bio: user.bio || "",
-    });
+    const payload = await profileWithLinks(user);
+    res.set("Cache-Control", "no-store");
+    res.json(payload);
   } catch (e) { next(e); }
 });
 
@@ -60,18 +79,12 @@ router.patch("/me", async (req, res, next) => {
     const user = await User.findOneAndUpdate(
       q,
       { $set: updates, $setOnInsert: { email: req.user.email } },
-      { new: true, upsert: true }           // <-- auto-provision if missing
+      { new: true, upsert: true }
     );
 
-    res.json({
-      id: String(user._id),
-      email: user.email,
-      firstName: user.firstName || "",
-      lastName: user.lastName || "",
-      avatarUrl: user.avatarUrl || "",
-      handle: user.handle || "",
-      bio: user.bio || "",
-    });
+    const payload = await profileWithLinks(user);
+    res.set("Cache-Control", "no-store");
+    res.json(payload);
   } catch (e) { next(e); }
 });
 

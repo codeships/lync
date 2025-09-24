@@ -51,6 +51,7 @@ app.use(cookieParser());
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: false })); // explicit to avoid deprecation
 app.use(morgan('dev'));
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 /* ------------------- Health / Debug --------------------- */
 app.get('/health', (_req, res) => res.json({ ok: true, env: NODE_ENV }));

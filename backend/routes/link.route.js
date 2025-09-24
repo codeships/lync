@@ -291,53 +291,42 @@ router.put("/me/bulk", async (req, res, next) => {
       return res.status(400).json({ error: "links must be an array" });
     }
 
-  // routes/links.js -> PUT /me/bulk
-// replace the validation loop with:
-for (const [idx, l] of links.entries()) {
-  const rawTitle = (l?.title ?? l?.name ?? "").toString().trim();
-  const rawUrl = (l?.url ?? "").toString().trim();
-  if (!rawTitle || rawTitle.length > MAX_TITLE_LEN) {
-    return res.status(400).json({ error: `Link at index ${idx} has invalid title` });
-  }
-  try {
-    const u = new URL(/^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`);
-    if (u.protocol !== "http:" && u.protocol !== "https:") throw new Error();
-  } catch {
-    return res.status(400).json({ error: `Link at index ${idx} has invalid URL` });
-  }
-  if (l?.isActive != null && typeof l.isActive !== "boolean") {
-    return res.status(400).json({ error: `Link at index ${idx} has invalid isActive` });
-  }
-}
+    // Validate + normalize input
+    const normalized = [];
+    for (const [idx, l] of links.entries()) {
+      const rawTitle = (l?.title ?? l?.name ?? "").toString().trim();
+      const rawUrl   = (l?.url ?? "").toString().trim();
 
-// when creating docs:
-const docs = links.map((l, idx) => {
- const uid = req.user.id; // string of ObjectId is fine; Mongoose will cast
-const docs = links.map((l, idx) => ({
-  user: uid,                       // <-- Mongoose casts to ObjectId
-  title: l.title.trim(),
-  url: l.url.trim(),
-  isActive: l.isActive !== false,
-  order: idx,
-}));
+      if (!rawTitle || rawTitle.length > MAX_TITLE_LEN) {
+        return res.status(400).json({ error: `Link at index ${idx} has invalid title` });
+      }
 
-});
+      // auto-prefix like your frontend helper does
+      const safeUrl = /^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`;
+      if (!validateUrl(safeUrl)) {
+        return res.status(400).json({ error: `Link at index ${idx} has invalid URL` });
+      }
+
+      if (l?.isActive != null && typeof l.isActive !== "boolean") {
+        return res.status(400).json({ error: `Link at index ${idx} has invalid isActive` });
+      }
+
+      normalized.push({
+        user: uid,
+        title: rawTitle,
+        url: safeUrl.trim(),
+        isActive: l.isActive !== false,
+        order: idx,
+      });
+    }
 
     const session = await beginSession();
 
     const run = async () => {
       await Link.deleteMany({ user: uid }, session ? { session } : undefined);
 
-      const docs = links.map((l, idx) => ({
-        user: uid,
-        title: normalizeTitle(l.title),
-        url: String(l.url).trim(),
-        isActive: l.isActive !== false,
-        order: idx,
-      }));
-
-      if (docs.length) {
-        await Link.insertMany(docs, { ordered: true, ...(session && { session }) });
+      if (normalized.length) {
+        await Link.insertMany(normalized, { ordered: true, ...(session && { session }) });
       }
 
       return Link.find({ user: uid }, null, session ? { session } : {})
@@ -345,17 +334,18 @@ const docs = links.map((l, idx) => ({
         .lean();
     };
 
+    let result;
     if (session) {
-      let result;
       await session.withTransaction(async () => {
         result = await run();
       });
       await session.endSession();
-      return res.status(200).json(result);
     } else {
-      const result = await run();
-      return res.status(200).json(result);
+      result = await run();
     }
+
+    res.set("Cache-Control", "no-store");
+    return res.status(200).json(result);
   } catch (err) {
     next(err);
   }
