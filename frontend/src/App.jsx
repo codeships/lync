@@ -30,6 +30,7 @@ function App() {
             <p>Current path: {window.location.pathname}</p>
           </div>
         } /> */}
+        <Analytics />
       </Routes>
   );
 }
