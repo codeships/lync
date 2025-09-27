@@ -5,7 +5,7 @@ import {
   getPublicProfileCached,
   normalizeHandle,
   resolveAssetUrl,
-} from "../../lib/api"; // <-- correct path (+ .js)
+} from "../../lib/api.js"; // <-- correct path (+ .js)
 
 export default function Preview() {
   const { handle: raw } = useParams();              // route pattern: /@:handle
