@@ -6,29 +6,29 @@ import { LogIn } from "./pages/auth/LogIn";
 import { Dashboard } from "./pages/Dashboard";
 import { Profile } from "./pages/Profile";
 import { Links } from "./pages/Links";
-import Preview from "./pages/Preview";
+import PublicProfile from "./pages/PublicProfile";
 
+// Temporary debugging version of App.jsx
 function App() {
   return (
       <Routes>
-        {/* Public routes */}
+        <Route path="/:handle" element={<PublicProfile />} />
         <Route path="/" element={<Home />} />
         <Route path="/signup" element={<SignUp />} />
         <Route path="/login" element={<LogIn />} />
-        
-        {/* Public shareable profile: https://site.com/@yourhandle */}
-        {/* This should come AFTER specific routes but BEFORE catch-alls */}
-        <Route path="/@:handle" element={<Preview />} />
-
-        {/* Private dashboard */}
         <Route path="/dashboard" element={<Dashboard />}>
           <Route index element={<Navigate to="links" replace />} />
           <Route path="links" element={<Links />} />
           <Route path="profile" element={<Profile />} />
         </Route>
-
-        {/* 404 fallback - keep this LAST */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        
+        {/* Debug route */}
+        {/* <Route path="*" element={
+          <div>
+            <h2>404 - Route not found</h2>
+            <p>Current path: {window.location.pathname}</p>
+          </div>
+        } /> */}
       </Routes>
   );
 }
