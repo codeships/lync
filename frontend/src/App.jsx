@@ -7,7 +7,6 @@ import { Dashboard } from "./pages/Dashboard";
 import { Profile } from "./pages/Profile";
 import { Links } from "./pages/Links";
 import PublicProfile from "./pages/PublicProfile";
-import { Analytics } from "@vercel/analytics/react"
 
 // Temporary debugging version of App.jsx
 function App() {
@@ -30,7 +29,6 @@ function App() {
             <p>Current path: {window.location.pathname}</p>
           </div>
         } /> */}
-        <Analytics />
       </Routes>
   );
 }
