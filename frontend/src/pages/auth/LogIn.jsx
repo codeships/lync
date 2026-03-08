@@ -1,8 +1,8 @@
 import { useState } from "react";
-import Logo from "../../assets/logo.png";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Eye, EyeOff, AtSign, Lock, Mail } from "lucide-react";
 import { login, setAuthToken } from "../../../lib/api";
-import { Eye, EyeOff } from "lucide-react";
+import { AuthShell } from "../../components/AuthShell";
 
 export const LogIn = () => {
   const navigate = useNavigate();
@@ -10,172 +10,148 @@ export const LogIn = () => {
 
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
-  const [displayname, setDisplayname] = useState(""); // optional
+  const [displayname, setDisplayname] = useState("");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
-  const [showPass, setShowPass] = useState(true);
-  const [showUser, setShowUser] = useState(true);
-
+  const [showPass, setShowPass] = useState(false);
 
   const loginWithMail = async (e) => {
-  e.preventDefault();
-  if (!email || !pass) return;
+    e.preventDefault();
+    if (!email || !pass) return;
 
-  setLoading(true);
-  setMsg("");
+    setLoading(true);
+    setMsg("");
 
-  try {
-    // Build the payload with email, password, and optional displayName
-    const payload = {
-      email,
-      password: pass,
-      ...(displayname ? { displayName: displayname } : {}),
-    };
+    try {
+      const payload = {
+        email,
+        password: pass,
+        ...(displayname ? { displayName: displayname } : {}),
+      };
 
-    const out = await login(payload);
+      const out = await login(payload);
+      const data = out?.data ?? out ?? {};
+      const token = data.token ?? data.accessToken ?? data.jwt ?? null;
+      const user = data.user ?? data.profile ?? null;
 
-    // Support multiple API response shapes
-    const data  = out?.data ?? out ?? {};
-    const token = data.token ?? data.accessToken ?? data.jwt ?? null;
-    const user  = data.user  ?? data.profile     ?? null;
+      if (!token) {
+        throw new Error("No token returned from server");
+      }
 
-    if (!token) {
-      throw new Error("No token returned from server");
+      setAuthToken(token);
+
+      if (user) {
+        localStorage.setItem("me", JSON.stringify(user));
+      } else {
+        localStorage.removeItem("me");
+      }
+
+      navigate(location.state?.from || "/dashboard");
+    } catch (err) {
+      const apiMsg =
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        err?.message ||
+        "Login failed. Please try again.";
+      setMsg(apiMsg);
+      setAuthToken(null);
+      localStorage.removeItem("me");
+    } finally {
+      setLoading(false);
     }
-
-    // Persist token via shared helper (so axios adds Authorization header automatically)
-    setAuthToken(token);
-
-    if (user) {
-      localStorage.setItem("me", JSON.stringify(user));
-    } else {
-      localStorage.removeItem("me"); // clear old data if no user returned
-    }
-
-    // Navigate to dashboard or original protected route
-    navigate(location.state?.from || "/dashboard");
-  } catch (err) {
-    const apiMsg =
-      err?.response?.data?.error ||
-      err?.response?.data?.message ||
-      err?.message ||
-      "Login failed. Please try again.";
-    setMsg(apiMsg);
-
-    // Clear stale token/user on failure
-    setAuthToken(null);
-    localStorage.removeItem("me");
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   return (
-    <div>
-      <nav>
-        <ul className="flex flex-row items-center justify-between p-5">
-          <li className="flex items-center gap-3">
-            <img src={Logo} alt="Lync" className="w-12 h-12 object-contain" />
-            <span className="text-xl font-semibold">Lync</span>
-          </li>
-          <li>
-            <Link
-              to="/signup"
-              className="bg-gray-100 text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-200 transition"
-            >
-              Sign Up
-            </Link>
-          </li>
-        </ul>
-      </nav>
+    <AuthShell
+      title="Welcome back"
+      subtitle="Sign in to update your page, adjust your links, and publish a cleaner public profile."
+      sideTitle="Your creator hub should feel polished the moment you return."
+      sideBody="Use linkships to keep every important destination in sync and ready to share without fighting a messy editor."
+      alternateLabel="Create account"
+      alternateTo="/signup"
+    >
+      <form onSubmit={loginWithMail} className="space-y-4">
+        {msg && (
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {msg}
+          </div>
+        )}
 
-      <div className="flex flex-col items-center">
-        <div className="flex flex-col items-center mt-5 w-[380px] max-w-full">
-          <h1 className="text-xl font-bold mb-5">Welcome Back</h1>
-
-          {msg && (
-            <div className="w-full mb-3 text-sm text-blue-700 bg-blue-50 p-2 rounded">
-              {msg}
-            </div>
-          )}
-
-          <form onSubmit={loginWithMail} className="flex flex-col gap-4 w-full">
+        <label className="block">
+          <span className="mb-2 block text-sm font-semibold text-slate-700">Email</span>
+          <div className="field-shell flex items-center gap-3 rounded-2xl px-4 py-3">
+            <Mail className="h-4 w-4 text-slate-400" />
             <input
               type="email"
               name="email"
-              id="email"
-              placeholder="Email"
+              placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="border p-2 w-full rounded-[5px]"
               autoComplete="email"
               required
             />
-
-            {/* Password with visibility toggle */}
-            <div className="relative w-full">
-              <input
-                type={showPass ? "text" : "password"}
-                name="password"
-                id="password"
-                placeholder="Password"
-                value={pass}
-                onChange={(e) => setPass(e.target.value)}
-                className="border p-2 w-full rounded-[5px] pr-10"
-                autoComplete="current-password"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPass((s) => !s)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-gray-100"
-                aria-label={showPass ? "Hide password" : "Show password"}
-                title={showPass ? "Hide password" : "Show password"}
-              >
-                {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-
-            {/* Optional displayname (if your backend accepts email OR displayname) */}
-            <div className="relative w-full">
-              <input
-                type={showUser ? "text" : "password"}
-                name="displayname"
-                id="displayname"
-                placeholder="Display name (optional)"
-                value={displayname}
-                onChange={(e) => setDisplayname(e.target.value)}
-                className="border p-2 w-full rounded-[5px] pr-10"
-                autoComplete="username"
-              />
-              <button
-                type="button"
-                onClick={() => setShowUser((s) => !s)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-gray-100"
-                aria-label={showUser ? "Hide display name" : "Show display name"}
-                title={showUser ? "Hide display name" : "Show display name"}
-              >
-                {showUser ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading || !email || !pass}
-              className="bg-blue-500 w-full text-xl text-white rounded-sm p-2 hover:bg-black disabled:opacity-50"
-            >
-              {loading ? "Logging in..." : "Log In"}
-            </button>
-          </form>
-
-          <div className="mt-6 text-sm">
-            Don&apos;t have an account?{" "}
-            <Link to="/signup" className="text-blue-600 underline">
-              Sign Up
-            </Link>
           </div>
-        </div>
-      </div>
-    </div>
+        </label>
+
+        <label className="block">
+          <span className="mb-2 block text-sm font-semibold text-slate-700">
+            Password
+          </span>
+          <div className="field-shell flex items-center gap-3 rounded-2xl px-4 py-3">
+            <Lock className="h-4 w-4 text-slate-400" />
+            <input
+              type={showPass ? "text" : "password"}
+              name="password"
+              placeholder="Enter your password"
+              value={pass}
+              onChange={(e) => setPass(e.target.value)}
+              autoComplete="current-password"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPass((s) => !s)}
+              className="text-slate-400 transition hover:text-slate-700"
+              aria-label={showPass ? "Hide password" : "Show password"}
+            >
+              {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+        </label>
+
+        <label className="block">
+          <span className="mb-2 block text-sm font-semibold text-slate-700">
+            Display name
+            <span className="ml-2 text-xs font-medium text-slate-400">optional</span>
+          </span>
+          <div className="field-shell flex items-center gap-3 rounded-2xl px-4 py-3">
+            <AtSign className="h-4 w-4 text-slate-400" />
+            <input
+              type="text"
+              name="displayname"
+              placeholder="your_handle"
+              value={displayname}
+              onChange={(e) => setDisplayname(e.target.value)}
+              autoComplete="username"
+            />
+          </div>
+        </label>
+
+        <button
+          type="submit"
+          disabled={loading || !email || !pass}
+          className="brand-button mt-2 w-full rounded-2xl px-5 py-4 text-base font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {loading ? "Logging in..." : "Log in"}
+        </button>
+      </form>
+
+      <p className="mt-6 text-sm text-slate-600">
+        New to linkships?{" "}
+        <Link to="/signup" className="font-semibold text-[#d74a11]">
+          Create your account
+        </Link>
+      </p>
+    </AuthShell>
   );
 };

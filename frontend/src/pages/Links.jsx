@@ -1,18 +1,16 @@
-// src/pages/dashboard/Links.jsx
-import React, { useState } from "react";
+import { useState } from "react";
 import { useOutletContext } from "react-router-dom";
-import { MdDelete } from "react-icons/md";
-import { FaGlobe, FaTwitter, FaLinkedin, FaYoutube } from "react-icons/fa";
+import { Plus, Trash2, Save, Link2 } from "lucide-react";
+import { FaGlobe, FaLinkedin, FaTwitter, FaYoutube } from "react-icons/fa";
 import { TbDots } from "react-icons/tb";
-// IMPORTANT: include .js to avoid case/extension issues on Linux (Vercel)
 import { listMyLinks, saveMyLinks } from "../../lib/api.js";
 
 const OPTIONS = [
-  { value: "website",  label: "Website",  Icon: FaGlobe },
-  { value: "twitter",  label: "Twitter",  Icon: FaTwitter },
+  { value: "website", label: "Website", Icon: FaGlobe },
+  { value: "twitter", label: "Twitter", Icon: FaTwitter },
   { value: "linkedin", label: "LinkedIn", Icon: FaLinkedin },
-  { value: "youtube",  label: "YouTube",  Icon: FaYoutube },
-  { value: "custom",   label: "Custom",   Icon: TbDots },
+  { value: "youtube", label: "YouTube", Icon: FaYoutube },
+  { value: "custom", label: "Custom", Icon: TbDots },
 ];
 
 const URL_PLACEHOLDER = {
@@ -20,83 +18,68 @@ const URL_PLACEHOLDER = {
   twitter: "https://twitter.com/your_handle",
   linkedin: "https://www.linkedin.com/in/your_id",
   youtube: "https://youtube.com/@your_channel",
-  custom:  "https://your-link",
+  custom: "https://your-link",
 };
 
 const labelForType = (type) =>
-  (OPTIONS.find((o) => o.value === type)?.label) || "Link";
+  OPTIONS.find((option) => option.value === type)?.label || "Link";
 
 const ensureHttpUrl = (s = "") => {
-  const t = String(s).trim();
-  if (!t) return "";
-  return /^https?:\/\//i.test(t) ? t : `https://${t}`;
+  const value = String(s).trim();
+  if (!value) return "";
+  return /^https?:\/\//i.test(value) ? value : `https://${value}`;
 };
 
-// Normalize local rows → server payload
 const toBulkPayload = (links = []) =>
   links
-    .filter((l) => String(l?.url || "").trim()) // keep only rows with a URL
-    .map((l, idx) => ({
-      title: (l?.name || "").trim() || labelForType(l?.type) || `Link ${idx + 1}`,
-      url: ensureHttpUrl(l?.url || ""),
-      isActive: l?.isActive !== false,
+    .filter((link) => String(link?.url || "").trim())
+    .map((link, idx) => ({
+      title: (link?.name || "").trim() || labelForType(link?.type) || `Link ${idx + 1}`,
+      url: ensureHttpUrl(link?.url || ""),
+      isActive: link?.isActive !== false,
     }));
 
 export const Links = () => {
-  // Expected outlet context: { links, addLink, removeLink, updateLink, setLinks?, replaceLinks? }
   const outlet = useOutletContext() || {};
   const {
     links = [],
     addLink = () => {},
     removeLink = () => {},
     updateLink = () => {},
-    // Prefer replaceLinks if parent provided, else fall back to overwriting setLinks
-    replaceLinks,
     setLinks,
   } = outlet;
 
   const [saving, setSaving] = useState(false);
-  const [status, setStatus] = useState(null); // { type: 'success'|'error', msg: string }
+  const [status, setStatus] = useState(null);
 
   const handleSave = async () => {
     setSaving(true);
     setStatus(null);
+
     try {
-      // Keep local draft
       localStorage.setItem("links", JSON.stringify(links));
-
-      // Build normalized payload array
       const payload = toBulkPayload(links);
-
-      // Save to server (PUT /api/links/me/bulk)
-      // saveMyLinks() expects (linksArray, token?) and wraps { links } body.
-      const token = localStorage.getItem("token"); // optional; interceptor also adds it if stored
+      const token = localStorage.getItem("token");
       await saveMyLinks(payload, token);
 
-      // Optionally refresh from server (GET /api/links/me) to reflect canonical order/_ids
       try {
         const { data: resp } = await listMyLinks(token);
         const items = resp?.data || [];
         const mapped = items.map((doc) => ({
           id: doc._id,
           _id: doc._id,
-          type: "custom", // or infer from URL if desired
+          type: "custom",
           name: doc.title,
           url: doc.url,
           isActive: doc.isActive,
           order: doc.order,
         }));
-
-        if (typeof replaceLinks === "function") {
-          replaceLinks(mapped);
-        } else if (typeof setLinks === "function") {
-          setLinks(mapped);
-        }
+        if (typeof setLinks === "function") setLinks(mapped);
       } catch {
-        // ignore refetch errors; save succeeded
+        // Ignore refresh failures because the save request already succeeded.
       }
 
-      setStatus({ type: "success", msg: "Links saved!" });
+      setStatus({ type: "success", msg: "Links saved." });
     } catch (e) {
       const msg =
         e?.response?.data?.error ||
@@ -110,127 +93,170 @@ export const Links = () => {
   };
 
   return (
-    <div className="bg-white p-5 rounded border">
-      <h1 className="text-xl font-bold mb-2">Customize your links</h1>
-      <h3 className="text-gray-400 mb-5">
-        Add/edit/remove below and then share your profile with the world!
-      </h3>
+    <div className="glass-panel-strong rounded-[2rem] p-5 sm:p-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+            Links editor
+          </p>
+          <h1 className="mt-2 font-display text-4xl font-bold tracking-tight text-slate-950">
+            Shape the path people follow.
+          </h1>
+          <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
+            Add the destinations that matter most and keep your public profile
+            focused. The first few links should represent your strongest actions.
+          </p>
+        </div>
 
-      <div>
         <button
           type="button"
           onClick={addLink}
-          className="border rounded text-blue-600 border-blue-600 flex items-center bg-white px-6 py-2"
+          className="brand-button inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition"
         >
-          <span className="text-xl mr-2">+</span>
-          <span>Add New Link</span>
+          <Plus className="h-4 w-4" />
+          Add link
         </button>
       </div>
 
-      <div>
+      <div className="mt-8 space-y-4">
+        {links.length === 0 && (
+          <div className="mesh-card rounded-[1.8rem] border border-dashed border-black/10 p-8 text-center">
+            <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[#132238] text-white">
+              <Link2 className="h-5 w-5" />
+            </div>
+            <h2 className="mt-4 text-xl font-semibold text-slate-950">
+              Start with your most important destination
+            </h2>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-7 text-slate-600">
+              Add a website, social profile, booking page, shop link, or custom URL.
+            </p>
+          </div>
+        )}
+
         {links.map((item, idx) => {
-          const selected = OPTIONS.find((o) => o.value === item.type);
+          const selected = OPTIONS.find((option) => option.value === item.type);
           const Icon = selected?.Icon || TbDots;
           const key = item.id || item._id || `link-${idx}`;
+          const targetId = item.id || item._id;
 
           return (
-            <div key={key} className="border p-5 mt-5 rounded">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-2">
-                  <Icon className="text-xl" />
-                  <span className="text-sm text-gray-500">
-                    {selected?.label || "No type"}
-                  </span>
+            <article key={key} className="mesh-card glass-panel rounded-[1.8rem] p-5">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#132238] text-white">
+                    <Icon />
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+                      Link {idx + 1}
+                    </div>
+                    <div className="mt-1 text-lg font-semibold text-slate-950">
+                      {selected?.label || "Choose a link type"}
+                    </div>
+                  </div>
                 </div>
 
                 <button
                   type="button"
-                  onClick={() => removeLink(item.id || item._id)}
-                  className="p-1 rounded hover:bg-red-50"
-                  title="Remove link"
+                  onClick={() => removeLink(targetId)}
+                  className="inline-flex items-center gap-2 self-start rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100"
                   aria-label="Remove link"
                 >
-                  <MdDelete className="text-red-600 text-xl" />
+                  <Trash2 className="h-4 w-4" />
+                  Remove
                 </button>
               </div>
 
-              {/* Link type */}
-              <div className="mt-4">
-                <label className="block mb-2">Link Type</label>
-                <select
-                  value={item.type || ""}
-                  onChange={(e) => {
-                    const type = e.target.value;
-                    const opt = OPTIONS.find((o) => o.value === type);
-                    updateLink(item.id || item._id, {
-                      type,
-                      name: type === "custom" ? item.name : (opt?.label || ""),
-                    });
-                  }}
-                  className="border p-2 w-full rounded"
-                >
-                  <option value="" disabled>Choose link name</option>
-                  {OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
+              <div className="mt-5 grid gap-4 lg:grid-cols-2">
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-slate-700">
+                    Link type
+                  </span>
+                  <div className="field-shell rounded-2xl px-4 py-3">
+                    <select
+                      value={item.type || ""}
+                      onChange={(e) => {
+                        const type = e.target.value;
+                        const option = OPTIONS.find((entry) => entry.value === type);
+                        updateLink(targetId, {
+                          type,
+                          name: type === "custom" ? item.name : option?.label || "",
+                        });
+                      }}
+                    >
+                      <option value="" disabled>
+                        Choose link type
+                      </option>
+                      {OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-slate-700">
+                    Display title
+                  </span>
+                  <div className="field-shell rounded-2xl px-4 py-3">
+                    <input
+                      type="text"
+                      value={item.name || ""}
+                      onChange={(e) =>
+                        updateLink(targetId, { name: e.target.value })
+                      }
+                      placeholder={
+                        item.type === "custom"
+                          ? "What should visitors see?"
+                          : labelForType(item.type)
+                      }
+                    />
+                  </div>
+                </label>
               </div>
 
-              {/* Custom name when type = custom */}
-              {item.type === "custom" && (
-                <div className="mt-4">
-                  <label className="block mb-2">Custom Name</label>
+              <label className="mt-4 block">
+                <span className="mb-2 block text-sm font-semibold text-slate-700">
+                  Destination URL
+                </span>
+                <div className="field-shell rounded-2xl px-4 py-3">
                   <input
-                    type="text"
-                    value={item.name || ""}
-                    onChange={(e) =>
-                      updateLink(item.id || item._id, { name: e.target.value })
-                    }
-                    className="border p-2 w-full rounded"
-                    placeholder="Enter custom link name"
+                    type="url"
+                    value={item.url || ""}
+                    onChange={(e) => updateLink(targetId, { url: e.target.value })}
+                    placeholder={URL_PLACEHOLDER[item.type] || "https://your-link"}
                   />
                 </div>
-              )}
-
-              {/* URL */}
-              <div className="mt-4">
-                <label className="block mb-2">Link URL</label>
-                <input
-                  type="url"
-                  value={item.url || ""}
-                  onChange={(e) =>
-                    updateLink(item.id || item._id, { url: e.target.value })
-                  }
-                  className="border p-2 w-full rounded"
-                  placeholder={URL_PLACEHOLDER[item.type] || "https://your-link"}
-                />
-              </div>
-            </div>
+              </label>
+            </article>
           );
         })}
+      </div>
 
-        {/* Save actions */}
-        <div className="mt-5 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="border rounded text-white bg-blue-600 hover:bg-blue-700 px-6 py-2 disabled:opacity-50"
+      <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving}
+          className="brand-button inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <Save className="h-4 w-4" />
+          {saving ? "Saving..." : "Save links"}
+        </button>
+
+        {status && (
+          <span
+            className={`rounded-full px-4 py-2 text-sm font-semibold ${
+              status.type === "success"
+                ? "bg-emerald-50 text-emerald-700"
+                : "bg-red-50 text-red-700"
+            }`}
           >
-            {saving ? "Saving..." : "Save"}
-          </button>
-          {status && (
-            <span
-              className={
-                status.type === "success"
-                  ? "text-green-600 text-sm"
-                  : "text-red-600 text-sm"
-              }
-            >
-              {status.msg}
-            </span>
-          )}
-        </div>
+            {status.msg}
+          </span>
+        )}
       </div>
     </div>
   );

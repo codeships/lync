@@ -1,14 +1,17 @@
-// src/pages/Dashboard.jsx
-import React, { useEffect, useMemo, useState } from "react";
-import Logo from "../assets/logo.png";
+import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { FaLink, FaRegUserCircle, FaGlobe, FaTwitter, FaLinkedin, FaYoutube } from "react-icons/fa";
-import { IoEyeOutline } from "react-icons/io5";
-import { RxExit } from "react-icons/rx";
+import {
+  ArrowUpRight,
+  Eye,
+  Link2,
+  LogOut,
+  Sparkles,
+  UserRound,
+} from "lucide-react";
+import { FaGlobe, FaLinkedin, FaTwitter, FaYoutube } from "react-icons/fa";
 import { TbDots } from "react-icons/tb";
-
-// IMPORTANT: include .js to be safe on Linux (Vercel)
 import { logout as apiLogout, getMyProfile } from "../../lib/api.js";
+import { BrandMark } from "../components/BrandMark";
 
 const ICONS = {
   website: FaGlobe,
@@ -21,7 +24,6 @@ const ICONS = {
 export const Dashboard = () => {
   const navigate = useNavigate();
 
-  // ====== Links state (lifted) ======
   const [links, setLinks] = useState(() => {
     try {
       const raw = localStorage.getItem("links");
@@ -34,222 +36,269 @@ export const Dashboard = () => {
   useEffect(() => {
     try {
       localStorage.setItem("links", JSON.stringify(links));
-    } catch {}
+    } catch {
+      // Ignore storage failures so the editor remains usable.
+    }
   }, [links]);
 
   const addLink = () => {
     const id = (crypto?.randomUUID && crypto.randomUUID()) || Date.now();
     setLinks((prev) => [...prev, { id, type: "", name: "", url: "" }]);
   };
-  const removeLink = (id) => setLinks((prev) => prev.filter((l) => l.id !== id));
-  const updateLink = (id, patch) =>
-    setLinks((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)));
 
-  // ====== Profile state (lifted) ======
-  const [selectedFile, setSelectedFile] = useState(null); // File object
-  const image = useMemo(() => {
+  const removeLink = (id) => {
+    setLinks((prev) => prev.filter((link) => (link.id || link._id) !== id));
+  };
+
+  const updateLink = (id, patch) => {
+    setLinks((prev) =>
+      prev.map((link) =>
+        (link.id || link._id) === id ? { ...link, ...patch } : link
+      )
+    );
+  };
+
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [handle, setHandle] = useState("");
+  const [bio, setBio] = useState("");
+
+  const localPreview = useMemo(() => {
     if (!selectedFile) return "";
     return URL.createObjectURL(selectedFile);
   }, [selectedFile]);
 
   useEffect(() => {
     return () => {
-      if (image) URL.revokeObjectURL(image);
+      if (localPreview) URL.revokeObjectURL(localPreview);
     };
-  }, [image]);
+  }, [localPreview]);
 
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName]   = useState("");
-  const [handle, setHandle]       = useState("");   // <-- added
+  const image = localPreview || avatarUrl;
+  const fullName = [firstName, lastName].filter(Boolean).join(" ");
+  const publicPath = handle ? `/@${handle}` : "";
 
-  // Hydrate basic profile info for the left preview + preview URL
   useEffect(() => {
     (async () => {
       try {
         const { data } = await getMyProfile();
         if (data?.firstName) setFirstName(data.firstName);
-        if (data?.lastName)  setLastName(data.lastName);
-        if (data?.handle)    setHandle(data.handle);
+        if (data?.lastName) setLastName(data.lastName);
+        if (data?.handle) setHandle(data.handle);
+        if (data?.bio) setBio(data.bio);
+        if (data?.avatarUrl) setAvatarUrl(data.avatarUrl);
       } catch {
-        // ignore; user may not be logged in yet
+        // Ignore hydration failures; the editor can still work with local draft state.
       }
     })();
   }, []);
 
-  /** ===============================
-   * Logout Handler
-   * ===============================
-   */
   const handleLogout = async () => {
     try {
-      await apiLogout(); // Clears token & local storage (via helper)
-      navigate("/login"); // Redirect to login
-    } catch (err) {
-      console.error("Logout error:", err);
+      await apiLogout();
+      navigate("/login");
+    } catch {
       navigate("/login");
     }
   };
 
-  // Preview handler: go to public page if handle exists; else go to profile editor
   const goPreview = async () => {
     try {
-      const { data } = await getMyProfile();            // trust backend
-      const h = (data?.handle || "").trim().toLowerCase();
-      if (h) {
-        navigate(`/@${encodeURIComponent(h)}`);         // ✅ no colon in URL
+      const { data } = await getMyProfile();
+      const currentHandle = (data?.handle || "").trim().toLowerCase();
+      if (currentHandle) {
+        navigate(`/@${encodeURIComponent(currentHandle)}`);
       } else {
-        navigate("/dashboard/profile");                 // ask user to set a handle
+        navigate("/dashboard/profile");
       }
     } catch {
       navigate("/login");
     }
   };
 
-  const navLinkBase = "flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100";
-  const navLinkActive = "text-blue-600";
+  const navClass = ({ isActive }) =>
+    [
+      "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition",
+      isActive
+        ? "bg-[#132238] text-white shadow-lg"
+        : "text-slate-600 hover:bg-white hover:text-slate-950",
+    ].join(" ");
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Navigation Bar */}
-      <nav className="bg-white border-b">
-        <ul className="max-w-6xl mx-auto flex justify-between items-center p-5">
-          <li className="flex items-center gap-3">
-            <img src={Logo} alt="Lync logo" className="w-10 h-10 object-contain" />
-            <span className="text-xl font-semibold">Lync</span>
-          </li>
+    <div className="min-h-screen px-4 py-5 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl">
+        <header className="glass-panel mb-6 rounded-[2rem] px-5 py-4 sm:px-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <BrandMark compact />
 
-          <li>
-            <ul className="flex gap-4">
-              <li>
-                <NavLink
-                  to="links"
-                  className={({ isActive }) => `${navLinkBase} ${isActive ? navLinkActive : ""}`}
-                  end
-                >
-                  <FaLink />
-                  <span>Links</span>
-                </NavLink>
-              </li>
-              <li>
-                <NavLink
-                  to="profile"
-                  className={({ isActive }) => `${navLinkBase} ${isActive ? navLinkActive : ""}`}
-                >
-                  <FaRegUserCircle />
-                  <span>Profile Details</span>
-                </NavLink>
-              </li>
-            </ul>
-          </li>
-
-          {/* Right icons */}
-          <li>
-            <ul className="flex gap-3 items-center">
-              <li
-                className="p-2 rounded hover:bg-gray-100 cursor-pointer"
-                title={handle ? `Preview /@${handle}` : "Preview (set a handle first)"}
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
                 onClick={goPreview}
+                className="brand-outline inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-white"
+                title={handle ? `Preview ${publicPath}` : "Set a handle to preview"}
               >
-                <IoEyeOutline />
-              </li>
-              <li
-                className="p-2 rounded hover:bg-gray-100 cursor-pointer text-red-600"
-                title="Log out"
-                onClick={handleLogout}
-              >
-                <RxExit />
-              </li>
-            </ul>
-          </li>
-        </ul>
-      </nav>
+                <Eye className="h-4 w-4" />
+                Preview
+              </button>
 
-      {/* Main Content */}
-      <main className="max-w-6xl mx-auto flex gap-8 p-5">
-        {/* LEFT: Live Preview */}
-        <aside className="hidden md:block border bg-white rounded w-[320px] min-h-[60vh] p-4">
-          <div className="flex flex-col items-center gap-3 mb-4">
-            <div className="w-24 h-24 rounded-full bg-gray-100 overflow-hidden border">
-              {image ? (
-                <img src={image} alt="Profile" className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full grid place-items-center text-gray-400 text-sm">
-                  No photo
-                </div>
-              )}
-            </div>
-            <div className="text-center">
-              <div className="font-medium">
-                {[firstName, lastName].filter(Boolean).join(" ") || "Your name"}
-              </div>
-              {handle ? (
-                <div className="text-xs text-gray-500 mt-1">/@{handle}</div>
-              ) : (
-                <div className="text-xs text-gray-400 mt-1">set your handle to share</div>
-              )}
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100"
+              >
+                <LogOut className="h-4 w-4" />
+                Log out
+              </button>
             </div>
           </div>
+        </header>
 
-          <p className="text-sm text-gray-500 mb-3">Links</p>
-          <div className="space-y-2">
-            {links.length === 0 && (
-              <div className="text-gray-400 text-sm">No links yet — add one!</div>
-            )}
-            {links.map((link) => {
-              const Icon = ICONS[link.type || "custom"] || TbDots;
-              const label = link.name || (link.type ? link.type : "Untitled");
-              const key = link.id || link._id;
-              return (
-                <div
-                  key={key}
-                  className="flex items-center justify-between border rounded px-3 py-2"
-                >
-                  <span className="flex items-center gap-2">
-                    <Icon />
-                    <span className="truncate max-w-[200px]">{label}</span>
-                  </span>
-                  {link.url ? (
-                    <a
-                      href={link.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-blue-600 text-sm"
-                    >
-                      visit
-                    </a>
+        <main className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
+          <aside className="space-y-5">
+            <section className="glass-panel-strong mesh-card rounded-[2rem] p-5">
+              <div className="flex items-center justify-between">
+                <span className="rounded-full bg-[#132238] px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-white">
+                  editor
+                </span>
+                <Sparkles className="h-4 w-4 text-[#ff6b2c]" />
+              </div>
+
+              <div className="mt-5 flex items-center gap-4">
+                <div className="grid h-20 w-20 place-items-center overflow-hidden rounded-[1.5rem] bg-[#132238] text-lg font-bold text-white">
+                  {image ? (
+                    <img src={image} alt="Profile" className="h-full w-full object-cover" />
                   ) : (
-                    <span className="text-gray-400 text-xs">no url</span>
+                    (fullName || "LS")
+                      .split(" ")
+                      .map((part) => part[0])
+                      .join("")
+                      .slice(0, 2)
+                      .toUpperCase()
                   )}
                 </div>
-              );
-            })}
-          </div>
-        </aside>
+                <div className="min-w-0">
+                  <div className="truncate font-display text-2xl font-bold text-slate-950">
+                    {fullName || "Your name"}
+                  </div>
+                  <div className="mt-1 truncate text-sm text-slate-500">
+                    {handle ? `@${handle}` : "Claim a shareable handle"}
+                  </div>
+                </div>
+              </div>
 
-        {/* RIGHT: Nested pages receive state & actions via Outlet context */}
-        <section className="flex-1">
-          <Outlet
-            context={{
-              // links management
-              links,
-              addLink,
-              removeLink,
-              updateLink,
-              setLinks,
-              // profile management
-              image,
-              selectedFile,
-              setSelectedFile,
-              firstName,
-              setFirstName,
-              lastName,
-              setLastName,
-              handle,            // <-- expose to children
-              setHandle,         // <--
-            }}
-          />
-        </section>
-      </main>
+              <p className="mt-5 text-sm leading-6 text-slate-600">
+                {bio || "Add your links, shape your profile, and preview the page your audience will land on."}
+              </p>
+
+              <div className="mt-6 grid gap-3">
+                <NavLink to="links" className={navClass} end>
+                  <Link2 className="h-4 w-4" />
+                  Links
+                </NavLink>
+                <NavLink to="profile" className={navClass}>
+                  <UserRound className="h-4 w-4" />
+                  Profile details
+                </NavLink>
+              </div>
+            </section>
+
+            <section className="glass-panel rounded-[2rem] p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                    live preview
+                  </p>
+                  <h2 className="mt-2 font-display text-2xl font-bold text-slate-950">
+                    Public card
+                  </h2>
+                </div>
+                {handle && (
+                  <span className="rounded-full bg-[#fff0e8] px-3 py-1 text-xs font-semibold text-[#d74a11]">
+                    {publicPath}
+                  </span>
+                )}
+              </div>
+
+              <div className="mt-5 rounded-[1.8rem] bg-[#132238] p-4 text-white">
+                <div className="flex items-center gap-3">
+                  <div className="grid h-14 w-14 place-items-center overflow-hidden rounded-2xl bg-white/10 text-sm font-bold">
+                    {image ? (
+                      <img src={image} alt="Preview avatar" className="h-full w-full object-cover" />
+                    ) : (
+                      (fullName || "LS")
+                        .split(" ")
+                        .map((part) => part[0])
+                        .join("")
+                        .slice(0, 2)
+                        .toUpperCase()
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="truncate font-semibold">
+                      {fullName || "Your name"}
+                    </div>
+                    <div className="truncate text-sm text-white/65">
+                      {handle ? `@${handle}` : "@yourhandle"}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 space-y-2">
+                  {links.length === 0 && (
+                    <div className="rounded-2xl border border-white/10 bg-white/8 px-4 py-3 text-sm text-white/65">
+                      No links yet. Add one from the editor.
+                    </div>
+                  )}
+                  {links.slice(0, 4).map((link, index) => {
+                    const Icon = ICONS[link.type || "custom"] || TbDots;
+                    const label = link.name || link.type || `Link ${index + 1}`;
+                    return (
+                      <div
+                        key={link.id || link._id || index}
+                        className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/8 px-4 py-3"
+                      >
+                        <div className="flex min-w-0 items-center gap-3">
+                          <Icon className="shrink-0" />
+                          <span className="truncate text-sm">{label}</span>
+                        </div>
+                        <ArrowUpRight className="h-4 w-4 shrink-0 text-white/60" />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </section>
+          </aside>
+
+          <section className="min-w-0">
+            <Outlet
+              context={{
+                links,
+                addLink,
+                removeLink,
+                updateLink,
+                setLinks,
+                image,
+                avatarUrl,
+                setAvatarUrl,
+                selectedFile,
+                setSelectedFile,
+                firstName,
+                setFirstName,
+                lastName,
+                setLastName,
+                handle,
+                setHandle,
+                bio,
+                setBio,
+              }}
+            />
+          </section>
+        </main>
+      </div>
     </div>
   );
 };

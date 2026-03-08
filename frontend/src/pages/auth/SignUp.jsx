@@ -1,15 +1,15 @@
 import { useState } from "react";
-import Logo from "../../assets/logo.png";
 import { Link, useNavigate } from "react-router-dom";
-import { FaFacebook, FaGithub, FaGoogle } from "react-icons/fa";
+import { AtSign, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { register } from "../../../lib/api.js";
+import { AuthShell } from "../../components/AuthShell";
 
 export const SignUp = () => {
   const navigate = useNavigate();
   const [form, setForm] = useState({ email: "", password: "", displayName: "" });
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
-  const [showPassword, setShowPassword] = useState(true); // default: show password
+  const [showPassword, setShowPassword] = useState(false);
 
   const onChange = (e) => {
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
@@ -36,7 +36,7 @@ export const SignUp = () => {
       const { data } = await register({
         email: form.email,
         password: form.password,
-        displayName: form.displayName, // <-- backend expects displayName
+        displayName: form.displayName,
       });
 
       if (data?.token) localStorage.setItem("token", data.token);
@@ -56,130 +56,102 @@ export const SignUp = () => {
   };
 
   return (
-    <div>
-      <nav>
-        <ul className="flex flex-row items-center justify-between p-5">
-          <li className="flex items-center gap-3">
-            <img src={Logo} alt="logo" className="w-12 h-12 object-contain" />
-            <span className="text-xl font-semibold">Lync</span>
-          </li>
-          <li>
-            <Link
-              to="/login"
-              className="bg-gray-100 text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-200 transition"
-            >
-              Log In
-            </Link>
-          </li>
-        </ul>
-      </nav>
-
-      <main>
-        <div>
-          <div className="flex flex-col gap-4 items-center">
-            <h1 className="text-xl font-bold">Sign Up for free</h1>
-
-            {/* Social sign-ups (disabled until backend OAuth is ready) */}
-            <button
-              className="flex flex-row items-center gap-2 bg-gray-100 w-[220px] p-3 rounded-xl disabled:opacity-60"
-              disabled
-              title="Google sign-up coming soon"
-            >
-              Sign Up with Google <FaGoogle />
-            </button>
-
-            <button
-              className="flex flex-row items-center gap-2 bg-gray-100 w-[220px] p-3 rounded-xl disabled:opacity-60"
-              disabled
-              title="GitHub sign-up coming soon"
-            >
-              Sign Up with GitHub <FaGithub />
-            </button>
-
-            <button
-              className="flex flex-row items-center gap-2 bg-gray-100 w-[220px] p-3 rounded-xl disabled:opacity-60"
-              disabled
-              title="Facebook sign-up coming soon"
-            >
-              Sign Up with Facebook <FaFacebook />
-            </button>
-
-            <h2 className="text-sm">or</h2>
-
-            {/* Email form */}
-            <div className="flex flex-col items-center">
-              <form onSubmit={emailSignUp} className="flex flex-col gap-5 items-center">
-                <input
-                  type="email"
-                  name="email"
-                  id="email"
-                  placeholder="Email"
-                  className="border p-2 w-80 rounded-[5px]"
-                  value={form.email}
-                  onChange={onChange}
-                  autoComplete="email"
-                  required
-                />
-
-                {/* Password input with toggle */}
-                <div className="relative w-80">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    name="password"
-                    id="password"
-                    placeholder="Password"
-                    className="border p-2 w-full rounded-[5px] pr-12"
-                    value={form.password}
-                    onChange={onChange}
-                    autoComplete="new-password"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-2 text-sm text-blue-600 hover:underline"
-                  >
-                    {showPassword ? "Hide" : "Show"}
-                  </button>
-                </div>
-
-                <input
-                  type="text"
-                  name="displayName"
-                  id="displayName"
-                  placeholder="Display name"
-                  className="border p-2 w-80 rounded-[5px]"
-                  value={form.displayName}
-                  onChange={onChange}
-                  autoComplete="username"
-                  required
-                />
-
-                <button
-                  type="submit"
-                  className="bg-blue-500 w-[380px] text-xl text-white rounded-sm p-2 flex items-center justify-center hover:bg-black disabled:opacity-60"
-                  disabled={loading}
-                >
-                  {loading ? "Creating..." : "Create Account"}
-                </button>
-              </form>
-
-              {err && <p className="text-red-600 mt-3 text-sm">{err}</p>}
-
-              <div className="flex flex-col items-center gap-4 mt-5">
-                <p className="text-sm">
-                  Your display name will be used in your Lync link. It must be
-                  unique and can only contain letters, numbers, and underscores.
-                </p>
-                <p className="text-sm">
-                  By signing up, you agree to our Terms of Service and Privacy
-                  Policy.
-                </p>
-              </div>
-            </div>
+    <AuthShell
+      title="Create your linkships account"
+      subtitle="Reserve your handle, build your page, and start sharing one clean destination everywhere."
+      sideTitle="Build a page that matches the quality of what you make."
+      sideBody="Start with a distinct handle, add the links that matter, and publish a public profile that feels current instead of generic."
+      alternateLabel="Have an account?"
+      alternateTo="/login"
+    >
+      <form onSubmit={emailSignUp} className="space-y-4">
+        {err && (
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {err}
           </div>
-        </div>
-      </main>
-    </div>
+        )}
+
+        <label className="block">
+          <span className="mb-2 block text-sm font-semibold text-slate-700">Email</span>
+          <div className="field-shell flex items-center gap-3 rounded-2xl px-4 py-3">
+            <Mail className="h-4 w-4 text-slate-400" />
+            <input
+              type="email"
+              name="email"
+              placeholder="you@example.com"
+              value={form.email}
+              onChange={onChange}
+              autoComplete="email"
+              required
+            />
+          </div>
+        </label>
+
+        <label className="block">
+          <span className="mb-2 block text-sm font-semibold text-slate-700">
+            Password
+          </span>
+          <div className="field-shell flex items-center gap-3 rounded-2xl px-4 py-3">
+            <Lock className="h-4 w-4 text-slate-400" />
+            <input
+              type={showPassword ? "text" : "password"}
+              name="password"
+              placeholder="Choose a secure password"
+              value={form.password}
+              onChange={onChange}
+              autoComplete="new-password"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((s) => !s)}
+              className="text-slate-400 transition hover:text-slate-700"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+        </label>
+
+        <label className="block">
+          <span className="mb-2 block text-sm font-semibold text-slate-700">
+            Display name
+          </span>
+          <div className="field-shell flex items-center gap-3 rounded-2xl px-4 py-3">
+            <AtSign className="h-4 w-4 text-slate-400" />
+            <input
+              type="text"
+              name="displayName"
+              placeholder="your_handle"
+              value={form.displayName}
+              onChange={onChange}
+              autoComplete="username"
+              required
+            />
+          </div>
+        </label>
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="brand-button mt-2 w-full rounded-2xl px-5 py-4 text-base font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {loading ? "Creating account..." : "Create account"}
+        </button>
+      </form>
+
+      <div className="mt-6 space-y-3 text-sm leading-6 text-slate-600">
+        <p>
+          Your display name becomes the base of your public linkships identity. Use
+          something short, clear, and easy to share.
+        </p>
+        <p>
+          Already registered?{" "}
+          <Link to="/login" className="font-semibold text-[#d74a11]">
+            Sign in instead
+          </Link>
+        </p>
+      </div>
+    </AuthShell>
   );
 };

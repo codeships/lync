@@ -1,16 +1,16 @@
-// src/pages/PublicProfile.jsx
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
+import { ArrowUpRight, Link2 } from "lucide-react";
 import {
   getPublicProfileCached,
   normalizeHandle,
   resolveAssetUrl,
-} from "../../lib/api"; // keep this import
+} from "../../lib/api";
+import { BrandMark } from "../components/BrandMark";
 
 export default function PublicProfile() {
-  const { handle: raw } = useParams(); // route pattern: /@:handle
+  const { handle: raw } = useParams();
   const navigate = useNavigate();
-
   const handle = useMemo(() => normalizeHandle(raw), [raw]);
 
   const [data, setData] = useState(null);
@@ -18,11 +18,9 @@ export default function PublicProfile() {
   const [loading, setLoading] = useState(true);
   const [imgOk, setImgOk] = useState(true);
 
-  // Prefer absolute URL; otherwise use your resolver.
   const safeResolve = (url) => {
     if (!url || typeof url !== "string") return "";
     try {
-      // Absolute (http/https/data/blob) should pass through untouched.
       const lower = url.trim().toLowerCase();
       if (
         lower.startsWith("http://") ||
@@ -32,7 +30,6 @@ export default function PublicProfile() {
       ) {
         return url;
       }
-      // Otherwise defer to backend resolver (e.g., prepend CDN/API origin)
       return resolveAssetUrl(url);
     } catch {
       return "";
@@ -41,11 +38,12 @@ export default function PublicProfile() {
 
   useEffect(() => {
     if (!handle || handle === "handle") {
-      navigate("/dashboard/profile"); // placeholder → set a real handle
+      navigate("/dashboard/profile");
       return;
     }
 
     const ac = new AbortController();
+
     (async () => {
       try {
         setLoading(true);
@@ -68,152 +66,175 @@ export default function PublicProfile() {
     return () => ac.abort();
   }, [handle, navigate]);
 
-  const avatarSrc = useMemo(
-    () => safeResolve(data?.avatarUrl),
-    [data?.avatarUrl]
-  );
-
-  const initials = useMemo(() => {
-    const f = data?.firstName?.[0] ?? "";
-    const l = data?.lastName?.[0] ?? "";
-    const s = `${f}${l}`.toUpperCase();
-    return s || "👤";
-  }, [data?.firstName, data?.lastName]);
-
+  const avatarSrc = useMemo(() => safeResolve(data?.avatarUrl), [data?.avatarUrl]);
   const displayName = useMemo(
     () => (data ? [data.firstName, data.lastName].filter(Boolean).join(" ") : ""),
     [data]
   );
+  const initials = useMemo(() => {
+    const first = data?.firstName?.[0] ?? "";
+    const last = data?.lastName?.[0] ?? "";
+    const result = `${first}${last}`.toUpperCase();
+    return result || "LS";
+  }, [data?.firstName, data?.lastName]);
 
-  // Basic URL cleaner for link display text
-  const prettyUrl = (u) => {
+  const prettyUrl = (url) => {
     try {
-      const s = String(u || "");
-      return s.replace(/^https?:\/\//i, "").replace(/\/$/, "");
+      return String(url || "").replace(/^https?:\/\//i, "").replace(/\/$/, "");
     } catch {
       return "";
     }
   };
 
-  // Loading
   if (loading) {
     return (
-      <div className="max-w-md mx-auto p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-16 h-16 rounded-full bg-gray-200 animate-pulse" />
-          <div className="flex-1 space-y-2">
-            <div className="h-5 w-3/4 bg-gray-200 rounded animate-pulse" />
-            <div className="h-4 w-1/2 bg-gray-200 rounded animate-pulse" />
-          </div>
-        </div>
-        <div className="space-y-3">
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-12 bg-gray-100 rounded-lg animate-pulse" />
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  // Error
-  if (err) {
-    const isNotFound = err === "user_not_found" || /not\s*found/i.test(String(err));
-    return (
-      <div className="max-w-md mx-auto p-6 text-center">
-        <div className="text-red-600 font-semibold mb-2">
-          {isNotFound ? "User not found" : "Error loading profile"}
-        </div>
-        <div className="text-sm text-gray-600 mb-4">
-          {isNotFound
-            ? `We couldn't find a public profile for @${handle}.`
-            : String(err)}
-        </div>
-        <button
-          onClick={() => navigate("/")}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-        >
-          Go Home
-        </button>
-      </div>
-    );
-  }
-
-  if (!data) {
-    return (
-      <div className="max-w-md mx-auto p-6 text-center">
-        <div className="text-gray-600">No profile data available.</div>
-      </div>
-    );
-  }
-
-  // Success
-  return (
-    <div className="max-w-md mx-auto p-6">
-      {/* Header */}
-      <div className="text-center mb-6">
-        <div className="flex justify-center mb-4">
-          {avatarSrc && imgOk ? (
-            <img
-              src={avatarSrc}
-              alt={displayName || data.handle}
-              className="w-20 h-20 rounded-full object-cover border-2 border-gray-200"
-              // Important: omit crossOrigin unless you truly need it and your server sends CORS headers.
-              onError={() => setImgOk(false)}
-              loading="lazy"
-              decoding="async"
-            />
-          ) : (
-            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 border-2 border-gray-200 grid place-items-center text-2xl font-bold text-gray-700">
-              {initials}
+      <div className="min-h-screen px-4 py-6 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-3xl">
+          <div className="glass-panel rounded-[2rem] p-6">
+            <div className="h-10 w-44 animate-pulse rounded-full bg-black/8" />
+            <div className="mt-10 flex items-center gap-5">
+              <div className="h-24 w-24 animate-pulse rounded-[2rem] bg-black/8" />
+              <div className="flex-1 space-y-3">
+                <div className="h-8 w-2/3 animate-pulse rounded-full bg-black/8" />
+                <div className="h-5 w-1/3 animate-pulse rounded-full bg-black/8" />
+              </div>
             </div>
-          )}
+            <div className="mt-8 space-y-3">
+              {[...Array(4)].map((_, index) => (
+                <div
+                  key={index}
+                  className="h-16 animate-pulse rounded-[1.5rem] bg-black/8"
+                />
+              ))}
+            </div>
+          </div>
         </div>
-
-        <h1 className="text-2xl font-bold text-gray-900">
-          {displayName || `${data.handle}`}
-        </h1>
-        <div className="text-gray-500 mb-2">@{data.handle}</div>
-
-        {!!data.bio && (
-          <div className="text-gray-700 bg-gray-50 rounded-lg p-3 text-sm whitespace-pre-wrap">
-            {data.bio}
-          </div>
-        )}
       </div>
+    );
+  }
 
-      {/* Links */}
-      <div className="space-y-3">
-        <h2 className="text-lg font-semibold text-gray-900">Links</h2>
+  if (err || !data) {
+    return (
+      <div className="min-h-screen px-4 py-6 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-3xl">
+          <div className="glass-panel-strong rounded-[2rem] p-6 sm:p-8">
+            <BrandMark compact />
+            <div className="mt-10 rounded-[2rem] bg-[#132238] px-6 py-8 text-white">
+              <div className="text-sm uppercase tracking-[0.24em] text-white/60">
+                Profile unavailable
+              </div>
+              <h1 className="mt-3 font-display text-4xl font-bold tracking-tight">
+                {err === "user_not_found"
+                  ? `We could not find @${handle}.`
+                  : "This profile is not available right now."}
+              </h1>
+              <p className="mt-4 max-w-xl text-sm leading-7 text-white/72">
+                If this should exist, ask the owner to confirm the handle inside
+                their linkships dashboard.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-        {Array.isArray(data.links) && data.links.length > 0 ? (
-          <div className="space-y-2">
-            {data.links.map((link) => {
-              const href = String(link?.url || "#");
-              const title = link?.title || prettyUrl(href) || "Link";
-              return (
-                <a
-                  key={link?._id || href}
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block p-3 bg-white border border-gray-200 rounded-lg hover:border-blue-500 hover:shadow-md transition-all duration-200 group"
-                >
-                  <div className="font-medium text-gray-900 group-hover:text-blue-600 truncate">
-                    {title}
-                  </div>
-                  <div className="text-sm text-gray-500 truncate">
-                    {prettyUrl(href)}
-                  </div>
-                </a>
-              );
-            })}
+  return (
+    <div className="min-h-screen px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-3xl">
+        <div className="glass-panel-strong overflow-hidden rounded-[2rem]">
+          <div className="bg-[linear-gradient(140deg,#132238_0%,#173053_62%,#0f2036_100%)] px-6 py-6 text-white sm:px-8">
+            <div className="flex items-center justify-between gap-4">
+              <BrandMark compact tone="light" />
+              <span className="rounded-full border border-white/12 bg-white/8 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-white/70">
+                public profile
+              </span>
+            </div>
+
+            <div className="mt-10 flex flex-col gap-6 sm:flex-row sm:items-center">
+              <div className="grid h-28 w-28 place-items-center overflow-hidden rounded-[2rem] bg-white/10 text-3xl font-bold">
+                {avatarSrc && imgOk ? (
+                  <img
+                    src={avatarSrc}
+                    alt={displayName || data.handle}
+                    className="h-full w-full object-cover"
+                    onError={() => setImgOk(false)}
+                  />
+                ) : (
+                  initials
+                )}
+              </div>
+
+              <div className="min-w-0">
+                <h1 className="truncate font-display text-4xl font-bold tracking-tight">
+                  {displayName || data.handle}
+                </h1>
+                <div className="mt-2 text-sm font-semibold uppercase tracking-[0.24em] text-white/62">
+                  @{data.handle}
+                </div>
+                {data.bio && (
+                  <p className="mt-4 max-w-xl text-sm leading-7 text-white/74">
+                    {data.bio}
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
-        ) : (
-          <div className="text-center py-8 text-gray-500">
-            <div className="text-lg mb-1">No links yet</div>
-            <div className="text-sm">This user hasn't added any links</div>
+
+          <div className="p-5 sm:p-8">
+            <div className="mb-5 flex items-center justify-between gap-4">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                  Active links
+                </div>
+                <h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-slate-950">
+                  Explore everything in one place
+                </h2>
+              </div>
+              <div className="rounded-full bg-[#fff0e8] px-4 py-2 text-sm font-semibold text-[#d74a11]">
+                {data?.meta?.linksCount || data?.links?.length || 0} live
+              </div>
+            </div>
+
+            {data?.links?.length ? (
+              <div className="space-y-3">
+                {data.links.map((link, index) => (
+                  <a
+                    key={link._id || `${link.url}-${index}`}
+                    href={link.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="group flex items-center justify-between gap-4 rounded-[1.6rem] border border-black/8 bg-white px-5 py-4 shadow-[0_10px_32px_rgba(17,16,13,0.06)] transition hover:-translate-y-0.5 hover:border-[#ff6b2c]/35 hover:shadow-[0_18px_40px_rgba(215,74,17,0.12)]"
+                  >
+                    <div className="flex min-w-0 items-center gap-4">
+                      <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#132238] text-white">
+                        <Link2 className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="truncate text-base font-semibold text-slate-950">
+                          {link.title || "Untitled link"}
+                        </div>
+                        <div className="truncate text-sm text-slate-500">
+                          {prettyUrl(link.url)}
+                        </div>
+                      </div>
+                    </div>
+                    <ArrowUpRight className="h-5 w-5 shrink-0 text-slate-400 transition group-hover:text-[#d74a11]" />
+                  </a>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-[1.8rem] border border-dashed border-black/10 bg-[#fbf7f0] px-6 py-8 text-center">
+                <h3 className="text-xl font-semibold text-slate-950">
+                  No active links yet
+                </h3>
+                <p className="mt-2 text-sm leading-7 text-slate-600">
+                  This profile exists, but there are no published links to show right now.
+                </p>
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
