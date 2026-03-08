@@ -7,15 +7,32 @@ const fromVite =
   import.meta?.env &&
   import.meta.env.VITE_API_URL;
 
+const inferDefaultBase = () => {
+  if (typeof window === "undefined") return "http://localhost:4000";
+
+  const { hostname } = window.location || {};
+  if (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "::1"
+  ) {
+    return "http://localhost:4000";
+  }
+
+  // In deployed environments, prefer same-origin so platform rewrites can
+  // forward /api and /uploads without requiring a separate env var.
+  return "/";
+};
+
 // Allow absolute (https://api...) or relative ("/") bases (for Vercel rewrites)
 const normalizeBase = (b) => {
-  if (!b) return "http://localhost:4000";
+  if (!b) return inferDefaultBase();
   const s = String(b).trim();
   // strip trailing slash
   return s.endsWith("/") && s !== "/" ? s.slice(0, -1) : s;
 };
 
-export const API_BASE = normalizeBase(fromVite || "http://localhost:4000");
+export const API_BASE = normalizeBase(fromVite);
 
 /* -------- Token storage helpers (SSR-safe) -------- */
 const canUseStorage = typeof window !== "undefined" && !!window.localStorage;
@@ -30,11 +47,17 @@ const storage = {
     try {
       if (val == null) window.localStorage.removeItem(key);
       else window.localStorage.setItem(key, val);
-    } catch {}
+    } catch {
+      // Storage can fail in private browsing or restricted environments.
+    }
   },
   remove(key) {
     if (!canUseStorage) return;
-    try { window.localStorage.removeItem(key); } catch {}
+    try {
+      window.localStorage.removeItem(key);
+    } catch {
+      // Ignore storage cleanup failures.
+    }
   },
 };
 
@@ -123,31 +146,6 @@ export const toggleLink = (id, isActive) =>
 export const reorderLinks = (items) =>
   api.post(`/api/links/me/reorder`, { items });
 
-// (Optional) helpers to normalize user-entered URLs when bulk-saving
-const OPTION_LABEL = {
-  website: "Website",
-  twitter: "Twitter",
-  linkedin: "LinkedIn",
-  youtube: "YouTube",
-  custom: "Custom",
-};
-
-const ensureHttpUrl = (s = "") => {
-  const t = String(s).trim();
-  if (!t) return "";
-  if (/^https?:\/\//i.test(t)) return t;
-  return `https://${t}`;
-};
-
-const toBulkPayload = (links = []) =>
-  links
-    .filter(l => (l.url || "").trim())
-    .map((l, idx) => ({
-      title: (l.name || "").trim() || OPTION_LABEL[l.type] || `Link ${idx + 1}`,
-      url: ensureHttpUrl(l.url),
-      isActive: l.isActive !== false,
-    }));
-
 export const listMyLinks = (token, { limit = 50, skip = 0, q = "" } = {}) =>
   api.get("/api/links/me", {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -230,7 +228,9 @@ export async function getPublicProfileCached(handle, { ttl = 30000, signal } = {
         return cached.data;
       }
     }
-  } catch {}
+  } catch {
+    // Ignore corrupted or inaccessible session storage.
+  }
 
   // 3) Network
   try {
@@ -238,7 +238,11 @@ export async function getPublicProfileCached(handle, { ttl = 30000, signal } = {
     const data = res.data;
     const pack = { data, ts: now };
     _ppMem.set(h, pack);
-    try { sessionStorage.setItem(_ppKey(h), JSON.stringify(pack)); } catch {}
+    try {
+      sessionStorage.setItem(_ppKey(h), JSON.stringify(pack));
+    } catch {
+      // Cache writes are optional.
+    }
     return data;
   } catch (e) {
     const msg = e?.response?.data?.error || e.message || "error";

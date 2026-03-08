@@ -224,15 +224,23 @@ const Home = () => {
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              {features.map(({ icon: Icon, title, text }) => (
-                <article key={title} className="glass-panel rounded-[1.8rem] p-6">
-                  <div className="inline-flex rounded-2xl bg-[#132238] p-3 text-white">
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <h3 className="mt-5 text-xl font-semibold text-slate-950">{title}</h3>
-                  <p className="mt-3 text-sm leading-7 text-slate-600">{text}</p>
-                </article>
-              ))}
+              {features.map((feature) => {
+                const FeatureIcon = feature.icon;
+
+                return (
+                  <article key={feature.title} className="glass-panel rounded-[1.8rem] p-6">
+                    <div className="inline-flex rounded-2xl bg-[#132238] p-3 text-white">
+                      <FeatureIcon className="h-5 w-5" />
+                    </div>
+                    <h3 className="mt-5 text-xl font-semibold text-slate-950">
+                      {feature.title}
+                    </h3>
+                    <p className="mt-3 text-sm leading-7 text-slate-600">
+                      {feature.text}
+                    </p>
+                  </article>
+                );
+              })}
             </div>
           </section>
 
