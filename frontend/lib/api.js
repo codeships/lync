@@ -232,9 +232,12 @@ export async function getPublicProfileCached(handle, { ttl = 30000, signal } = {
     // Ignore corrupted or inaccessible session storage.
   }
 
-  // 3) Network
+  // 3) Network (with retry for cold-start resilience)
   try {
-    const res = await api.get(`/api/public/${encodeURIComponent(h)}`, { signal });
+    const res = await withRetry(
+      () => api.get(`/api/public/${encodeURIComponent(h)}`, { signal }),
+      { retries: 2, baseDelay: 1000 }
+    );
     const data = res.data;
     const pack = { data, ts: now };
     _ppMem.set(h, pack);

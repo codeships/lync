@@ -113,6 +113,26 @@ export default function PublicProfile() {
     );
   }
 
+  const retry = () => {
+    setErr(null);
+    setData(null);
+    setLoading(true);
+    setImgOk(true);
+    (async () => {
+      try {
+        const profile = await getPublicProfileCached(handle, {
+          ttl: 0,
+          signal: undefined,
+        });
+        setData(profile || null);
+      } catch (e) {
+        setErr(e?.code || e?.message || "error");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  };
+
   if (err || !data) {
     return (
       <div className="min-h-screen px-4 py-6 sm:px-6 lg:px-8">
@@ -129,9 +149,19 @@ export default function PublicProfile() {
                   : "This profile is not available right now."}
               </h1>
               <p className="mt-4 max-w-xl text-sm leading-7 text-white/72">
-                If this should exist, ask the owner to confirm the handle inside
-                their linkships dashboard.
+                {err === "user_not_found"
+                  ? "If this should exist, ask the owner to confirm the handle inside their linkships dashboard."
+                  : "The server may be waking up. Give it a moment and try again."}
               </p>
+              {err !== "user_not_found" && (
+                <button
+                  type="button"
+                  onClick={retry}
+                  className="mt-5 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-[#132238] transition hover:bg-white/90"
+                >
+                  Try again
+                </button>
+              )}
             </div>
           </div>
         </div>
