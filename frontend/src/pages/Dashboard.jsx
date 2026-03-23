@@ -58,12 +58,22 @@ export const Dashboard = () => {
     );
   };
 
+  // Hydrate from localStorage immediately so the preview is never empty
+  const savedProfile = useMemo(() => {
+    try {
+      const raw = localStorage.getItem("profile");
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  }, []);
+
   const [selectedFile, setSelectedFile] = useState(null);
-  const [avatarUrl, setAvatarUrl] = useState("");
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [handle, setHandle] = useState("");
-  const [bio, setBio] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState(savedProfile.avatarUrl || "");
+  const [firstName, setFirstName] = useState(savedProfile.firstName || "");
+  const [lastName, setLastName] = useState(savedProfile.lastName || "");
+  const [handle, setHandle] = useState(savedProfile.handle || "");
+  const [bio, setBio] = useState(savedProfile.bio || "");
 
   const localPreview = useMemo(() => {
     if (!selectedFile) return "";
@@ -89,8 +99,16 @@ export const Dashboard = () => {
         if (data?.handle) setHandle(data.handle);
         if (data?.bio) setBio(data.bio);
         if (data?.avatarUrl) setAvatarUrl(data.avatarUrl);
+        // Persist to localStorage so the preview loads instantly next time
+        localStorage.setItem("profile", JSON.stringify({
+          firstName: data?.firstName || "",
+          lastName: data?.lastName || "",
+          handle: data?.handle || "",
+          bio: data?.bio || "",
+          avatarUrl: data?.avatarUrl || "",
+        }));
       } catch {
-        // Ignore hydration failures; the editor can still work with local draft state.
+        // API unavailable — localStorage data already populates the preview.
       }
     })();
   }, []);
