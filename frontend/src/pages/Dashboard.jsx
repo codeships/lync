@@ -157,7 +157,7 @@ export const Dashboard = () => {
         </header>
 
         <main className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
-          <aside className="space-y-5">
+          <aside className="space-y-5 xl:sticky xl:top-5 xl:self-start">
             <section className="glass-panel-strong mesh-card rounded-[2rem] p-5">
               <div className="flex items-center justify-between">
                 <span className="rounded-full bg-[#132238] px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-white">
@@ -205,7 +205,7 @@ export const Dashboard = () => {
               </div>
             </section>
 
-            <section className="glass-panel rounded-[2rem] p-5">
+            <section className="glass-panel sticky top-5 z-10 rounded-[2rem] p-5">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
