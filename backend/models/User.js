@@ -7,8 +7,6 @@ const SocialsSchema = new mongoose.Schema(
     instagram: { type: String, default: "" },
     twitter:   { type: String, default: "" },
     facebook:  { type: String, default: "" },
-    twitter: { type: String, default: "" },
-    facebook: { type: String, default: "" },
   },
   { _id: false }
 );
@@ -20,19 +18,6 @@ const ThemeSchema = new mongoose.Schema(
     buttonColor:     { type: String, default: "#3b82f6" },
     backgroundColor: { type: String, default: "#ffffff" },
     textColor:       { type: String, default: "#000000" },
-    theme: {
-      type: String,
-      enum: ["light", "dark", "system", "custom"],
-      default: "light",
-    },
-    buttonStyle: {
-      type: String,
-      enum: ["rounded", "square", "pill"],
-      default: "rounded",
-    },
-    buttonColor: { type: String, default: "#3b82f6" },
-    backgroundColor: { type: String, default: "#ffffff" },
-    textColor: { type: String, default: "#000000" },
   },
   { _id: false }
 );

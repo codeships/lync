@@ -119,7 +119,7 @@ api.interceptors.response.use(
 
 /* -------- Handy API helpers -------- */
 // Health
-export const pingHealth = () => api.get("/api/health");
+export const pingHealth = () => api.get("/health");
 
 /** Optional: call once on app start to warm the API (no React hooks here) */
 export const warmApi = () => pingHealth().catch(() => {});
